@@ -1,0 +1,1 @@
+export const nanoid = (size?: number) => 'mock-id'; 
