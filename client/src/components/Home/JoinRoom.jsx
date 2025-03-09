@@ -5,9 +5,7 @@ function JoinRoom({ onJoinRoom }) {
   const [roomCode, setRoomCode] = useState('')
 
   const handleJoinRoom = () => {
-    // Will implement socket connection later
-    console.log('Joining room:', roomCode, 'with player:', playerName)
-    onJoinRoom()
+    onJoinRoom(roomCode, playerName);
   }
 
   return (

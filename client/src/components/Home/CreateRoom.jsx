@@ -4,8 +4,7 @@ function CreateRoom({ onCreateRoom }) {
   const [playerName, setPlayerName] = useState('')
 
   const handleCreateRoom = () => {
-    console.log('Creating room with player:', playerName)
-    onCreateRoom()
+    onCreateRoom(playerName);
   }
 
   return (

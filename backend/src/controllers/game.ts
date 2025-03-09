@@ -36,4 +36,29 @@ export class GameController {
 
         res.json({ message: 'Joined game', gameCode, user: socketId });
     }
+
+    // Get all players in a room by game code in the params
+    static async getAllPlayersInRoom(req: Request, res: Response) {
+        const io: Server = req.app.get('io');
+        const { gameCode } = req.params;
+
+        try {
+            const sockets = await io.in(gameCode).fetchSockets();
+            
+            if (!sockets || sockets.length === 0) {
+                return res.status(404).json({ error: 'No players found in room' });
+            }
+
+            const playerIds = sockets.map(socket => socket.id);
+            res.json({ 
+                success: true,
+                room: gameCode,
+                playerCount: playerIds.length,
+                players: playerIds 
+            });
+        } catch (error) {
+            console.error('Error fetching players:', error);
+            res.status(500).json({ error: 'Failed to fetch players' });
+        }
+    }
 }

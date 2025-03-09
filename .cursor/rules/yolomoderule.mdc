@@ -1,0 +1,9 @@
+---
+description: Regularly test code
+globs: 
+---
+
+# Your rule content
+
+- All new code should be regularly tested.
+- All models should always be defined and there should be no untyped variables either in the client or the backend.
