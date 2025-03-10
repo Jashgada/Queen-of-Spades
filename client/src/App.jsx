@@ -3,7 +3,7 @@ import { Game } from './components/game/Game';
 
 function App() {
   return (
-    <div className="min-h-screen bg-green-900">
+    <div className="min-h-screen bg-felt bg-felt-texture">
       <Game />
     </div>
   );

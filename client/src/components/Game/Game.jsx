@@ -2,6 +2,26 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GameBoard } from './GameBoard';
 import { useGame } from '../../hooks/useGame';
 import { useSocket } from '../../hooks/useSocket';
+import { motion, AnimatePresence } from 'framer-motion';
+
+// Updated StatBox component
+const StatBox = ({ label, value }) => (
+  <div className="mb-2">
+    <div className="text-black/70 text-sm">{label}</div>
+    <div className="text-black font-semibold">{value}</div>
+  </div>
+);
+
+// Updated WinnerItem component
+const WinnerItem = ({ name, amount, avatar }) => (
+  <tr className="border-b border-black/10 last:border-0">
+    <td className="py-2 pr-2">
+      <img src={avatar} alt={name} className="w-6 h-6 rounded-full" />
+    </td>
+    <td className="py-2 text-black">{name}</td>
+    <td className="py-2 text-right text-black font-semibold">${amount}</td>
+  </tr>
+);
 
 export const Game = () => {
   const { gameState, errorMessage, createGame, joinGame, startGame, playCard, rematch, isCurrentPlayer } = useGame();
@@ -207,218 +227,312 @@ export const Game = () => {
     alert('Debug info logged to console');
   };
 
-  // Render appropriate view based on current state
+  // Render home view
   if (view === 'home') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-green-900 text-white">
-        <h1 className="text-4xl mb-8">Queen of Spades</h1>
-        <div className="space-y-4">
-          <button
-            onClick={() => setView('create')}
-            className="w-48 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-            disabled={!connected}
-          >
-            Create Game
-          </button>
-          <button
-            onClick={() => setView('join')}
-            className="w-48 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-            disabled={!connected}
-          >
-            Join Game
-          </button>
+      <div className="min-h-screen bg-felt bg-felt-texture p-6 flex flex-col items-center">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center mb-1">
+            <img src="/assets/images/crown.svg" alt="Crown" className="w-6 h-6 mr-2" />
+            <h1 className="text-black text-2xl font-bold">Queen of Spades</h1>
+          </div>
+          <div className="text-black/70 text-sm">Multiplayer Card Game</div>
         </div>
-        {!connected && (
-          <div className="mt-4 text-yellow-300">
-            Connecting to server...
+
+        {/* Main Container */}
+        <div className="w-full max-w-md bg-white rounded-md p-4 shadow-md">
+          {/* Action Buttons */}
+          <div className="mb-4">
+            <button 
+              onClick={() => setView('create')}
+              className="w-full bg-gray-200 hover:bg-gray-300 text-black py-1 px-2 rounded mb-2 flex items-center justify-center"
+            >
+              <img src="/assets/images/plus.svg" alt="Create" className="w-4 h-4 mr-2" />
+              Create New Room
+            </button>
+            <button 
+              onClick={() => setView('join')}
+              className="w-full bg-gray-200 hover:bg-gray-300 text-black py-1 px-2 rounded flex items-center justify-center"
+            >
+              <img src="/assets/images/gamepad.svg" alt="Join" className="w-4 h-4 mr-2" />
+              Join Room
+            </button>
           </div>
-        )}
-        {showDebug && (
-          <div className="mt-4">
-            <button onClick={showState} className="text-xs underline">Debug</button>
+
+          {/* Stats */}
+          <div className="mb-4">
+            <StatBox label="Active Players" value="1,234" />
+            <StatBox label="Active Rooms" value="89" />
           </div>
-        )}
+
+          {/* Recent Winners */}
+          <div>
+            <h2 className="text-black text-lg font-bold mb-2">Recent Winners</h2>
+            <table className="w-full">
+              <tbody>
+                <WinnerItem 
+                  name="Alex M."
+                  amount="1,200"
+                  avatar="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex"
+                />
+                <WinnerItem 
+                  name="Sarah K."
+                  amount="950"
+                  avatar="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah"
+                />
+                <WinnerItem 
+                  name="Mike R."
+                  amount="780"
+                  avatar="https://api.dicebear.com/7.x/avataaars/svg?seed=Mike"
+                />
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-auto pt-6 text-black/40 text-sm">
+          © 2025 Queen of Spades
+        </div>
       </div>
     );
   }
 
+  // Create game view
   if (view === 'create') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-green-900 text-white">
-        <h1 className="text-4xl mb-8">Create Game</h1>
-        <form onSubmit={handleCreateGame} className="space-y-4">
-          <div>
-            <input
-              type="text"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="Enter your name"
-              className="px-4 py-2 text-black rounded focus:outline-none w-64"
-              disabled={isLoading}
-            />
+      <div className="min-h-screen bg-felt bg-felt-texture p-6 flex flex-col items-center">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center mb-1">
+            <img src="/assets/images/crown.svg" alt="Crown" className="w-6 h-6 mr-2" />
+            <h1 className="text-black text-2xl font-bold">Queen of Spades</h1>
           </div>
-          <button
-            type="submit"
-            className={`w-full font-bold py-2 px-4 rounded ${
-              isLoading 
-                ? 'bg-gray-500 cursor-not-allowed' 
-                : 'bg-blue-500 hover:bg-blue-700 text-white'
-            }`}
-            disabled={isLoading || !connected}
-          >
-            {isLoading ? 'Creating...' : 'Create Game'}
-          </button>
-        </form>
-        <div className="mt-4 flex space-x-4">
-          <button
-            onClick={() => setView('home')}
-            className="text-gray-300 hover:text-white"
-            disabled={isLoading}
-          >
-            Back
-          </button>
-          {isLoading && (
-            <button
-              onClick={handleCancelLoading}
-              className="text-red-300 hover:text-red-100"
-            >
-              Cancel
-            </button>
+          <div className="text-black/70 text-sm">Create New Room</div>
+        </div>
+
+        {/* Form Container */}
+        <div className="w-full max-w-md bg-white rounded-md p-4 shadow-md">
+          <form onSubmit={handleCreateGame} className="space-y-4">
+            <div>
+              <label htmlFor="playerName" className="block text-black text-sm font-medium mb-1">
+                Your Name
+              </label>
+              <input
+                type="text"
+                id="playerName"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                className="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded text-black"
+                placeholder="Enter your name"
+                required
+                autoFocus
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setView('home')}
+                className="flex-1 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black rounded"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading || !connected}
+                className="flex-1 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Creating...' : 'Create Room'}
+              </button>
+            </div>
+          </form>
+          
+          {!connected && (
+            <div className="mt-4 text-yellow-600 text-center">
+              Connecting to server...
+            </div>
+          )}
+          
+          {errorMessage && (
+            <div className="mt-4 text-red-600 bg-red-100 p-2 rounded text-center">
+              {errorMessage}
+            </div>
           )}
         </div>
-        {errorMessage && (
-          <div className="mt-4 text-red-500 bg-red-900 p-2 rounded">
-            {errorMessage}
-          </div>
-        )}
-        {isLoading && (
-          <div className="mt-4 text-yellow-300">
-            Waiting for server response...
-          </div>
-        )}
-        {showDebug && (
-          <div className="mt-4">
-            <button onClick={showState} className="text-xs underline">Debug</button>
-          </div>
-        )}
       </div>
     );
   }
 
+  // Join game view
   if (view === 'join') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-green-900 text-white">
-        <h1 className="text-4xl mb-8">Join Game</h1>
-        <form onSubmit={handleJoinGame} className="space-y-4">
-          <div>
-            <input
-              type="text"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              placeholder="Enter your name"
-              className="w-64 px-4 py-2 text-black rounded focus:outline-none mb-2"
-              disabled={isLoading}
-            />
+      <div className="min-h-screen bg-felt bg-felt-texture p-6 flex flex-col items-center">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center mb-1">
+            <img src="/assets/images/crown.svg" alt="Crown" className="w-6 h-6 mr-2" />
+            <h1 className="text-black text-2xl font-bold">Queen of Spades</h1>
           </div>
-          <div>
-            <input
-              type="text"
-              value={gameCode}
-              onChange={(e) => setGameCode(e.target.value.toUpperCase())}
-              placeholder="Enter game code"
-              className="w-64 px-4 py-2 text-black rounded focus:outline-none"
-              disabled={isLoading}
-            />
-          </div>
-          <button
-            type="submit"
-            className={`w-full font-bold py-2 px-4 rounded ${
-              isLoading 
-                ? 'bg-gray-500 cursor-not-allowed' 
-                : 'bg-green-500 hover:bg-green-700 text-white'
-            }`}
-            disabled={isLoading || !connected}
-          >
-            {isLoading ? 'Joining...' : 'Join Game'}
-          </button>
-        </form>
-        <div className="mt-4 flex space-x-4">
-          <button
-            onClick={() => setView('home')}
-            className="text-gray-300 hover:text-white"
-            disabled={isLoading}
-          >
-            Back
-          </button>
-          {isLoading && (
-            <button
-              onClick={handleCancelLoading}
-              className="text-red-300 hover:text-red-100"
-            >
-              Cancel
-            </button>
+          <div className="text-black/70 text-sm">Join Room</div>
+        </div>
+
+        {/* Form Container */}
+        <div className="w-full max-w-md bg-white rounded-md p-4 shadow-md">
+          <form onSubmit={handleJoinGame} className="space-y-4">
+            <div>
+              <label htmlFor="playerName" className="block text-black text-sm font-medium mb-1">
+                Your Name
+              </label>
+              <input
+                type="text"
+                id="playerName"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                className="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded text-black"
+                placeholder="Enter your name"
+                required
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="gameCode" className="block text-black text-sm font-medium mb-1">
+                Room Code
+              </label>
+              <input
+                type="text"
+                id="gameCode"
+                value={gameCode}
+                onChange={(e) => setGameCode(e.target.value)}
+                className="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded text-black"
+                placeholder="Enter room code"
+                required
+                autoFocus
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setView('home')}
+                className="flex-1 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black rounded"
+              >
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading || !connected}
+                className="flex-1 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Joining...' : 'Join Room'}
+              </button>
+            </div>
+          </form>
+          
+          {!connected && (
+            <div className="mt-4 text-yellow-600 text-center">
+              Connecting to server...
+            </div>
+          )}
+          
+          {errorMessage && (
+            <div className="mt-4 text-red-600 bg-red-100 p-2 rounded text-center">
+              {errorMessage}
+            </div>
           )}
         </div>
-        {errorMessage && (
-          <div className="mt-4 text-red-500 bg-red-900 p-2 rounded">
-            {errorMessage}
-          </div>
-        )}
-        {isLoading && (
-          <div className="mt-4 text-yellow-300">
-            Waiting for server response...
-          </div>
-        )}
-        {showDebug && (
-          <div className="mt-4">
-            <button onClick={showState} className="text-xs underline">Debug</button>
-          </div>
-        )}
       </div>
     );
   }
 
+  // Lobby view
   if (view === 'lobby') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-green-900 text-white">
-        <h1 className="text-4xl mb-8">Game Lobby</h1>
-        {gameState.gameCode && (
-          <div className="mb-8 p-4 bg-green-800 rounded-lg text-center">
-            <div className="text-sm mb-1">Share this code with other players:</div>
-            <div className="text-3xl font-mono font-bold tracking-wider">{gameState.gameCode}</div>
+      <div className="min-h-screen bg-felt bg-felt-texture p-6 flex flex-col items-center">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center mb-1">
+            <img src="/assets/images/crown.svg" alt="Crown" className="w-6 h-6 mr-2" />
+            <h1 className="text-black text-2xl font-bold">Queen of Spades</h1>
           </div>
-        )}
-        <div className="mb-4">
-          Players joined: {gameState.players.length}
+          <div className="text-black/70 text-sm">Game Lobby</div>
         </div>
-        <div className="mb-8">
-          <h2 className="text-xl mb-2">Players:</h2>
-          <ul className="bg-green-800 rounded-lg p-4">
-            {gameState.players.map(player => (
-              <li key={player.id} className="text-lg mb-2">
-                {player.name} {player.id === gameState.currentPlayerId ? '(You)' : ''}
-              </li>
-            ))}
-          </ul>
+
+        {/* Lobby Container */}
+        <div className="w-full max-w-md bg-white rounded-md p-4 shadow-md">
+          {/* Room Code */}
+          <div className="mb-4 text-center">
+            <div className="text-black/70 text-sm mb-1">Room Code</div>
+            <div className="text-black text-xl font-bold tracking-wider bg-gray-100 py-1 px-4 rounded inline-block">
+              {gameState.gameCode}
+            </div>
+          </div>
+          
+          {/* Players */}
+          <div className="mb-4">
+            <h2 className="text-black text-lg font-bold mb-2">Players</h2>
+            <div className="bg-gray-100 rounded p-2">
+              {gameState.players.map((player, index) => (
+                <div 
+                  key={player.id} 
+                  className="flex items-center py-1 border-b border-gray-200 last:border-0"
+                >
+                  <div className="w-6 h-6 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center font-bold text-sm">
+                    {index + 1}
+                  </div>
+                  <div className="ml-2 text-black">
+                    {player.name}
+                    {player.id === gameState.currentPlayerId && ' (You)'}
+                  </div>
+                  {player.id === gameState.hostId && (
+                    <div className="ml-auto text-black/70 text-sm flex items-center">
+                      <span className="mr-1">Host</span>
+                      <span className="text-xs">👑</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          {/* Actions */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setView('home')}
+              className="flex-1 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black rounded"
+            >
+              Leave
+            </button>
+            {gameState.hostId === gameState.currentPlayerId && (
+              <button
+                onClick={handleStartGame}
+                disabled={gameState.players.length < 2 || isLoading}
+                className="flex-1 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black rounded disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Starting...' : 'Start Game'}
+              </button>
+            )}
+            {gameState.hostId !== gameState.currentPlayerId && (
+              <div className="flex-1 px-2 py-1 bg-gray-100 text-black/60 rounded text-center">
+                Waiting for host...
+              </div>
+            )}
+          </div>
+          
+          {/* Error message */}
+          {errorMessage && (
+            <div className="mt-4 text-red-600 bg-red-100 p-2 rounded text-center">
+              {errorMessage}
+            </div>
+          )}
         </div>
-        {gameState.players.length >= 2 && gameState.currentPlayerId === gameState.players[0]?.id && (
-          <button
-            onClick={handleStartGame}
-            className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
-          >
-            Start Game
-          </button>
-        )}
-        {errorMessage && (
-          <div className="mt-4 text-red-500 bg-red-900 p-2 rounded">
-            {errorMessage}
-          </div>
-        )}
-        {showDebug && (
-          <div className="mt-4">
-            <button onClick={showState} className="text-xs underline">Debug</button>
-          </div>
-        )}
+        
+        {/* Instructions */}
+        <div className="mt-4 text-black/70 text-center max-w-md">
+          <p>Share the room code with other players to join the game.</p>
+          <p className="mt-1">You need at least 2 players to start.</p>
+        </div>
       </div>
     );
   }

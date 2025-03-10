@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100" height="140" viewBox="0 0 100 140" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background pattern -->
+    <pattern id="diagonal" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+      <rect width="10" height="10" fill="#1a237e"/>
+      <path d="M-1,1 l2,-2 M8,12 l2,-2 M-1,11 l2,-2" stroke="#283593" stroke-width="1"/>
+    </pattern>
+    
+    <!-- Ornamental border -->
+    <pattern id="border" x="0" y="0" width="100" height="140" patternUnits="userSpaceOnUse">
+      <rect x="5" y="5" width="90" height="130" rx="5" stroke="#283593" stroke-width="2" fill="none"/>
+      <rect x="8" y="8" width="84" height="124" rx="3" stroke="#283593" stroke-width="1" fill="none"/>
+    </pattern>
+    
+    <!-- Center decoration -->
+    <g id="centerpiece">
+      <circle cx="0" cy="0" r="20" fill="#283593"/>
+      <path d="M0,-18 L5,-5 L18,0 L5,5 L0,18 L-5,5 L-18,0 L-5,-5 Z" fill="#1a237e"/>
+      <circle cx="0" cy="0" r="8" fill="#3949ab"/>
+      <circle cx="0" cy="0" r="5" fill="#1a237e"/>
+    </g>
+  </defs>
+
+  <!-- Card shape with background -->
+  <rect width="100" height="140" rx="7" fill="url(#diagonal)"/>
+  
+  <!-- Border -->
+  <rect width="100" height="140" rx="7" fill="url(#border)"/>
+  
+  <!-- Center decorations -->
+  <use href="#centerpiece" transform="translate(50,40) scale(0.8)"/>
+  <use href="#centerpiece" transform="translate(50,100) scale(0.8)"/>
+  
+  <!-- Corner decorations -->
+  <use href="#centerpiece" transform="translate(20,25) scale(0.4)"/>
+  <use href="#centerpiece" transform="translate(80,25) scale(0.4)"/>
+  <use href="#centerpiece" transform="translate(20,115) scale(0.4)"/>
+  <use href="#centerpiece" transform="translate(80,115) scale(0.4)"/>
+  
+  <!-- Highlight effect -->
+  <rect width="100" height="140" rx="7" fill="white" opacity="0.1"/>
+</svg> 
