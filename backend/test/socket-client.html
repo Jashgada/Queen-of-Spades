@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Queen of Spades - Socket.IO Test Client</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .panel {
+            flex: 1;
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        button {
+            padding: 8px 12px;
+            margin: 5px 0;
+            cursor: pointer;
+        }
+        input, select {
+            padding: 8px;
+            margin: 5px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        #log {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-top: 20px;
+            font-family: monospace;
+            background-color: #f5f5f5;
+        }
+        .card {
+            display: inline-block;
+            width: 60px;
+            height: 80px;
+            border: 1px solid #000;
+            border-radius: 5px;
+            margin: 5px;
+            text-align: center;
+            line-height: 80px;
+            cursor: pointer;
+            background-color: white;
+        }
+        .hearts, .diamonds {
+            color: red;
+        }
+        .clubs, .spades {
+            color: black;
+        }
+        .selected {
+            background-color: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Queen of Spades - Socket.IO Test Client</h1>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>Connection</h2>
+            <div>
+                <label for="playerName">Player Name:</label>
+                <input type="text" id="playerName" value="Player 1">
+            </div>
+            <div>
+                <button id="connectBtn">Connect</button>
+                <button id="disconnectBtn" disabled>Disconnect</button>
+            </div>
+            
+            <h2>Game Management</h2>
+            <div>
+                <button id="createGameBtn" disabled>Create Game</button>
+            </div>
+            <div>
+                <label for="gameCode">Game Code:</label>
+                <input type="text" id="gameCode">
+                <button id="joinGameBtn" disabled>Join Game</button>
+            </div>
+            <div>
+                <button id="startGameBtn" disabled>Start Game</button>
+            </div>
+            <div>
+                <button id="rematchBtn" disabled>Rematch</button>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2>Game State</h2>
+            <div id="gameInfo">
+                <p>Status: <span id="gameStatus">Not connected</span></p>
+                <p>Game Code: <span id="currentGameCode">-</span></p>
+                <p>Current Player: <span id="currentPlayer">-</span></p>
+                <p>Your ID: <span id="playerId">-</span></p>
+            </div>
+            
+            <h2>Players</h2>
+            <div id="playersList"></div>
+            
+            <h2>Scores</h2>
+            <div id="scoresList"></div>
+        </div>
+    </div>
+    
+    <h2>Your Hand</h2>
+    <div id="playerHand"></div>
+    
+    <h2>Current Trick</h2>
+    <div id="currentTrick"></div>
+    
+    <h2>Event Log</h2>
+    <div id="log"></div>
+    
+    <script>
+        let socket;
+        let playerData = {
+            id: null,
+            name: null,
+            hand: []
+        };
+        let gameData = {
+            code: null,
+            currentPlayer: null,
+            players: [],
+            scores: {},
+            currentTrick: [],
+            trickNumber: 0,
+            gameOver: false,
+            winner: null
+        };
+        let selectedCard = null;
+        
+        // DOM Elements
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const createGameBtn = document.getElementById('createGameBtn');
+        const joinGameBtn = document.getElementById('joinGameBtn');
+        const startGameBtn = document.getElementById('startGameBtn');
+        const rematchBtn = document.getElementById('rematchBtn');
+        const playerNameInput = document.getElementById('playerName');
+        const gameCodeInput = document.getElementById('gameCode');
+        const gameStatusSpan = document.getElementById('gameStatus');
+        const currentGameCodeSpan = document.getElementById('currentGameCode');
+        const currentPlayerSpan = document.getElementById('currentPlayer');
+        const playerIdSpan = document.getElementById('playerId');
+        const playersListDiv = document.getElementById('playersList');
+        const scoresListDiv = document.getElementById('scoresList');
+        const playerHandDiv = document.getElementById('playerHand');
+        const currentTrickDiv = document.getElementById('currentTrick');
+        const logDiv = document.getElementById('log');
+        
+        // Connect to Socket.IO server
+        connectBtn.addEventListener('click', () => {
+            if (!playerNameInput.value.trim()) {
+                logMessage('Please enter a player name');
+                return;
+            }
+            
+            socket = io('http://localhost:3000');
+            
+            // Connection events
+            socket.on('connect', () => {
+                logMessage('Connected to server');
+                playerData.name = playerNameInput.value.trim();
+                
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                createGameBtn.disabled = false;
+                joinGameBtn.disabled = false;
+                
+                gameStatusSpan.textContent = 'Connected';
+                playerIdSpan.textContent = socket.id;
+            });
+            
+            socket.on('disconnect', () => {
+                logMessage('Disconnected from server');
+                resetUI();
+            });
+            
+            // Game events
+            socket.on('game:playerJoined', (data) => {
+                logMessage(`Player joined: ${data.player.name}`);
+                gameData.players = data.players;
+                updatePlayersList();
+            });
+            
+            socket.on('game:started', (data) => {
+                logMessage('Game started');
+                gameData.currentPlayer = data.gameState.currentPlayer;
+                gameData.scores = data.gameState.scores;
+                gameData.trickNumber = data.gameState.trickNumber;
+                gameData.gameOver = data.gameState.gameOver;
+                gameData.winner = data.gameState.winner;
+                
+                gameStatusSpan.textContent = 'Playing';
+                currentPlayerSpan.textContent = getPlayerNameById(gameData.currentPlayer);
+                
+                updateScoresList();
+                updateUI();
+            });
+            
+            socket.on('game:playerState', (data) => {
+                logMessage('Received player state');
+                playerData.hand = data.hand;
+                playerData.id = data.currentPlayerId;
+                
+                playerIdSpan.textContent = playerData.id;
+                updatePlayerHand();
+            });
+            
+            socket.on('game:cardPlayed', (data) => {
+                logMessage(`Card played by ${getPlayerNameById(data.play.playerId)}`);
+                gameData.currentPlayer = data.nextPlayer;
+                
+                // Add the card to the current trick
+                gameData.currentTrick.push(data.play);
+                
+                currentPlayerSpan.textContent = getPlayerNameById(gameData.currentPlayer);
+                updateCurrentTrick();
+            });
+            
+            socket.on('game:trickComplete', (data) => {
+                logMessage(`Trick completed. Winner: ${getPlayerNameById(data.winner)}, Points: ${data.points}`);
+                gameData.scores = data.scores;
+                gameData.currentTrick = [];
+                
+                updateScoresList();
+                updateCurrentTrick();
+            });
+            
+            socket.on('game:over', (data) => {
+                logMessage(`Game over. Winner: ${getPlayerNameById(data.winner)}`);
+                gameData.gameOver = true;
+                gameData.winner = data.winner;
+                gameData.scores = data.scores;
+                
+                gameStatusSpan.textContent = 'Game Over';
+                updateScoresList();
+                rematchBtn.disabled = false;
+            });
+            
+            socket.on('game:restarted', (data) => {
+                logMessage('Game restarted');
+                gameData.currentPlayer = data.gameState.currentPlayer;
+                gameData.scores = data.gameState.scores;
+                gameData.trickNumber = data.gameState.trickNumber;
+                gameData.gameOver = false;
+                gameData.winner = null;
+                gameData.currentTrick = [];
+                
+                gameStatusSpan.textContent = 'Playing';
+                currentPlayerSpan.textContent = getPlayerNameById(gameData.currentPlayer);
+                
+                updateScoresList();
+                updateCurrentTrick();
+                rematchBtn.disabled = true;
+            });
+            
+            socket.on('game:playerLeft', (data) => {
+                logMessage(`Player left: ${getPlayerNameById(data.playerId)}`);
+                gameData.players = data.players;
+                updatePlayersList();
+            });
+            
+            socket.on('game:error', (data) => {
+                logMessage(`Error: ${data.message}`);
+            });
+        });
+        
+        // Disconnect from server
+        disconnectBtn.addEventListener('click', () => {
+            if (socket) {
+                socket.disconnect();
+                resetUI();
+            }
+        });
+        
+        // Create a new game
+        createGameBtn.addEventListener('click', () => {
+            socket.emit('game:create', { playerName: playerData.name }, (response) => {
+                if (response.success) {
+                    logMessage(`Game created with code: ${response.gameCode}`);
+                    gameData.code = response.gameCode;
+                    playerData.id = response.player.id;
+                    gameData.players = [response.player];
+                    
+                    currentGameCodeSpan.textContent = gameData.code;
+                    playerIdSpan.textContent = playerData.id;
+                    gameStatusSpan.textContent = 'Waiting for players';
+                    
+                    startGameBtn.disabled = false;
+                    updatePlayersList();
+                } else {
+                    logMessage(`Failed to create game: ${response.message}`);
+                }
+            });
+        });
+        
+        // Join an existing game
+        joinGameBtn.addEventListener('click', () => {
+            const gameCode = gameCodeInput.value.trim().toUpperCase();
+            if (!gameCode) {
+                logMessage('Please enter a game code');
+                return;
+            }
+            
+            logMessage(`Attempting to join game: ${gameCode}`);
+            socket.emit('game:join', { gameCode, playerName: playerData.name }, (response) => {
+                if (response.success) {
+                    logMessage(`Joined game with code: ${response.gameCode}`);
+                    gameData.code = response.gameCode;
+                    playerData.id = response.player.id;
+                    gameData.players = response.players;
+                    
+                    currentGameCodeSpan.textContent = gameData.code;
+                    playerIdSpan.textContent = playerData.id;
+                    gameStatusSpan.textContent = 'Waiting for game to start';
+                    
+                    updatePlayersList();
+                } else {
+                    logMessage(`Failed to join game: ${response.message}`);
+                }
+            });
+        });
+        
+        // Start the game
+        startGameBtn.addEventListener('click', () => {
+            socket.emit('game:start', (response) => {
+                if (response.success) {
+                    logMessage('Game started');
+                    startGameBtn.disabled = true;
+                } else {
+                    logMessage(`Failed to start game: ${response.message}`);
+                }
+            });
+        });
+        
+        // Request a rematch
+        rematchBtn.addEventListener('click', () => {
+            socket.emit('game:rematch', (response) => {
+                if (response.success) {
+                    logMessage('Rematch requested');
+                    rematchBtn.disabled = true;
+                } else {
+                    logMessage(`Failed to request rematch: ${response.message}`);
+                }
+            });
+        });
+        
+        // Play a card when clicked
+        playerHandDiv.addEventListener('click', (e) => {
+            if (e.target.classList.contains('card')) {
+                const cardIndex = parseInt(e.target.dataset.index);
+                const card = playerData.hand[cardIndex];
+                
+                if (gameData.currentPlayer === playerData.id) {
+                    socket.emit('game:playCard', { playerId: playerData.id, card }, (response) => {
+                        if (response.success) {
+                            logMessage(`Played card: ${card.value} of ${card.suit}`);
+                            // Remove the card from hand (will be updated by server)
+                            playerData.hand.splice(cardIndex, 1);
+                            updatePlayerHand();
+                        } else {
+                            logMessage(`Failed to play card: ${response.message}`);
+                        }
+                    });
+                } else {
+                    logMessage('Not your turn');
+                }
+            }
+        });
+        
+        // Helper functions
+        function resetUI() {
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            createGameBtn.disabled = true;
+            joinGameBtn.disabled = true;
+            startGameBtn.disabled = true;
+            rematchBtn.disabled = true;
+            
+            gameStatusSpan.textContent = 'Not connected';
+            currentGameCodeSpan.textContent = '-';
+            currentPlayerSpan.textContent = '-';
+            playerIdSpan.textContent = '-';
+            
+            playerData = {
+                id: null,
+                name: null,
+                hand: []
+            };
+            
+            gameData = {
+                code: null,
+                currentPlayer: null,
+                players: [],
+                scores: {},
+                currentTrick: [],
+                trickNumber: 0,
+                gameOver: false,
+                winner: null
+            };
+            
+            playersListDiv.innerHTML = '';
+            scoresListDiv.innerHTML = '';
+            playerHandDiv.innerHTML = '';
+            currentTrickDiv.innerHTML = '';
+        }
+        
+        function updatePlayersList() {
+            playersListDiv.innerHTML = '';
+            gameData.players.forEach(player => {
+                const playerElement = document.createElement('div');
+                playerElement.textContent = `${player.name} (${player.handSize} cards)`;
+                if (player.id === playerData.id) {
+                    playerElement.style.fontWeight = 'bold';
+                }
+                if (player.id === gameData.currentPlayer) {
+                    playerElement.style.color = 'green';
+                }
+                playersListDiv.appendChild(playerElement);
+            });
+        }
+        
+        function updateScoresList() {
+            scoresListDiv.innerHTML = '';
+            for (const playerId in gameData.scores) {
+                const scoreElement = document.createElement('div');
+                scoreElement.textContent = `${getPlayerNameById(playerId)}: ${gameData.scores[playerId]}`;
+                if (playerId === gameData.winner) {
+                    scoreElement.style.fontWeight = 'bold';
+                    scoreElement.style.color = 'green';
+                }
+                scoresListDiv.appendChild(scoreElement);
+            }
+        }
+        
+        function updatePlayerHand() {
+            playerHandDiv.innerHTML = '';
+            playerData.hand.forEach((card, index) => {
+                const cardElement = document.createElement('div');
+                cardElement.className = `card ${card.suit}`;
+                cardElement.textContent = getCardSymbol(card);
+                cardElement.dataset.index = index;
+                playerHandDiv.appendChild(cardElement);
+            });
+        }
+        
+        function updateCurrentTrick() {
+            currentTrickDiv.innerHTML = '';
+            gameData.currentTrick.forEach(play => {
+                const cardElement = document.createElement('div');
+                cardElement.className = `card ${play.card.suit}`;
+                cardElement.textContent = getCardSymbol(play.card);
+                
+                const playerName = document.createElement('div');
+                playerName.textContent = getPlayerNameById(play.playerId);
+                playerName.style.fontSize = '12px';
+                playerName.style.marginTop = '5px';
+                
+                const container = document.createElement('div');
+                container.style.display = 'inline-block';
+                container.style.textAlign = 'center';
+                container.style.margin = '0 10px';
+                
+                container.appendChild(cardElement);
+                container.appendChild(playerName);
+                
+                currentTrickDiv.appendChild(container);
+            });
+        }
+        
+        function getCardSymbol(card) {
+            const value = card.value;
+            const suit = card.suit;
+            let symbol = '';
+            
+            switch (suit) {
+                case 'hearts': symbol = '♥'; break;
+                case 'diamonds': symbol = '♦'; break;
+                case 'clubs': symbol = '♣'; break;
+                case 'spades': symbol = '♠'; break;
+            }
+            
+            return `${value}${symbol}`;
+        }
+        
+        function getPlayerNameById(playerId) {
+            if (!playerId) return 'Unknown';
+            
+            const player = gameData.players.find(p => p.id === playerId);
+            return player ? player.name : 'Unknown';
+        }
+        
+        function updateUI() {
+            updatePlayersList();
+            updateScoresList();
+            updatePlayerHand();
+            updateCurrentTrick();
+        }
+        
+        function logMessage(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(logEntry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+    </script>
+</body>
+</html> 

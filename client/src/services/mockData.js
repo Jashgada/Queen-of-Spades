@@ -170,7 +170,8 @@ export const mockEventResponses = {
         trickNumber: game.trickNumber,
         gameOver: game.gameOver,
         winner: game.winner,
-        targetScore: game.targetScore
+        targetScore: game.targetScore,
+        hand: hands[game.players[0].id] || []
       },
       message: 'Game started',
     };

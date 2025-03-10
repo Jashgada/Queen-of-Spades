@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <pattern id="grain" x="0" y="0" width="50" height="100" patternUnits="userSpaceOnUse">
+      <path d="M0 0h50v100H0z" fill="#8b4513"/>
+      <path d="M25 0c-5 25-5 75 0 100" stroke="#a45117" stroke-width="10" stroke-opacity="0.1" fill="none"/>
+      <path d="M0 0c5 25 5 75 0 100" stroke="#723a0f" stroke-width="15" stroke-opacity="0.1" fill="none"/>
+    </pattern>
+  </defs>
+  <rect width="100" height="100" fill="url(#grain)"/>
+</svg> 
