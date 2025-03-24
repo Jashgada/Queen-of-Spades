@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
@@ -5,11 +6,19 @@ import cors from 'cors';
 import setRoutes from './routes';
 import { setupSocketHandlers } from './controllers/socket';
 
+// CORS Configuration
+const isDevelopment = process.env.NODE_ENV === 'development';
+const corsOrigins = isDevelopment 
+    ? 'http://localhost:5173'
+    : process.env.FRONTEND_URL || '';
+
+console.log('CORS Origins:', corsOrigins);
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: ["http://localhost:5174", "http://localhost:5173", "http://localhost:8000"],
+        origin: corsOrigins,
         methods: ["GET", "POST"],
         credentials: true
     }
@@ -19,7 +28,7 @@ app.set('io', io); // Store the io instance in the app
 
 // Enable CORS for Express routes
 app.use(cors({
-    origin: ["http://localhost:5174", "http://localhost:5173", "http://localhost:8000"],
+    origin: corsOrigins,
     methods: ["GET", "POST"],
     credentials: true
 }));
