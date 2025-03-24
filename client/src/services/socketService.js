@@ -1,15 +1,13 @@
 import { io } from 'socket.io-client';
+import config from '../config';
 
 // Create a socket connection to the backend
-const socket = io('http://localhost:3000', {
-  autoConnect: false, // We'll connect manually
-  reconnection: true,
-  reconnectionAttempts: 5,
-  reconnectionDelay: 1000,
+const socket = io(config.socket.url, {
+  ...config.socket,
 });
 
 // Debug logging
-const DEBUG = true;
+const DEBUG = config.debug.socketLogs;
 
 // Log all events when in debug mode
 if (DEBUG) {
