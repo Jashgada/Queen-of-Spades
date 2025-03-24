@@ -13,18 +13,24 @@ const corsOrigins = isDevelopment
     : process.env.FRONTEND_URL || '';
 
 console.log('CORS Origins:', corsOrigins);
+console.log('Environment:', process.env.NODE_ENV);
 
 const app = express();
 const server = http.createServer(app);
+
+// Configure Socket.IO with proper CORS and transport options
 const io = new Server(server, {
     cors: {
         origin: corsOrigins,
         methods: ["GET", "POST"],
         credentials: true
-    }
+    },
+    transports: ['websocket', 'polling'], // Enable both WebSocket and polling
+    allowEIO3: true, // Enable Engine.IO v3 compatibility
+    path: '/socket.io/' // Explicitly set the Socket.IO path
 });
 
-app.set('io', io); // Store the io instance in the app
+app.set('io', io);
 
 // Enable CORS for Express routes
 app.use(cors({
