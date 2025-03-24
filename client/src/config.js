@@ -20,6 +20,7 @@ const config = {
   
   // Socket.IO settings
   socket: {
+    url: getBackendUrl(),
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
     timeout: 10000,
