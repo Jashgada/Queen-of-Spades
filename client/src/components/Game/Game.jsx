@@ -507,10 +507,12 @@ export const Game = () => {
             {gameState.hostId === gameState.currentPlayerId && (
               <button
                 onClick={handleStartGame}
-                disabled={gameState.players.length < 2 || isLoading}
+                disabled={gameState.players?.length < 2}
                 className="flex-1 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black rounded disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Starting...' : 'Start Game'}
+                {console.log('Players:', gameState.players)}
+                {console.log('Can start:', gameState.players?.length >= 2)}
+                Start Game ({gameState.players?.length || 0} players)
               </button>
             )}
             {gameState.hostId !== gameState.currentPlayerId && (

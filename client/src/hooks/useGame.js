@@ -16,7 +16,8 @@ const INITIAL_STATE = {
   winner: null,
   lastTrick: null,
   targetScore: 75,
-  gameStatus: 'waiting'
+  gameStatus: 'waiting',
+  hostId: null
 };
 
 export const useGame = () => {
@@ -37,10 +38,27 @@ export const useGame = () => {
     const handlePlayerJoined = (data) => {
       console.log('[useGame] Player joined:', data);
       if (data) {
-        setGameState(prev => ({
-          ...prev,
-          players: data.players || [data.player] || prev.players
-        }));
+        setGameState(prev => {
+          // Ensure we have the complete player data
+          const updatedPlayers = data.players || [];
+          
+          // If we only received a single player, add them to the existing players
+          if (data.player && !updatedPlayers.length) {
+            const existingPlayer = prev.players.find(p => p.id === data.player.id);
+            if (!existingPlayer) {
+              updatedPlayers.push(...prev.players, data.player);
+            } else {
+              updatedPlayers.push(...prev.players);
+            }
+          }
+
+          return {
+            ...prev,
+            players: updatedPlayers,
+            // If this is the first player (host), set hostId
+            hostId: prev.hostId || (updatedPlayers.length === 1 ? updatedPlayers[0].id : null)
+          };
+        });
       }
     };
     
@@ -55,11 +73,19 @@ export const useGame = () => {
           // Determine the player's hand
           let newHand = [];
           if (newState.hand) {
-            // If hand is provided directly
-            newHand = newState.hand;
+            // If hand is provided directly, ensure no duplicates
+            newHand = [...new Map(newState.hand.map(card => [
+              `${card.suit}-${card.value}`,
+              card
+            ])).values()];
           } else if (newState.hands && prev.currentPlayerId) {
             // If hands is provided as a map of player IDs to hands
-            newHand = newState.hands[prev.currentPlayerId] || [];
+            const playerHand = newState.hands[prev.currentPlayerId] || [];
+            // Ensure no duplicates in the player's hand
+            newHand = [...new Map(playerHand.map(card => [
+              `${card.suit}-${card.value}`,
+              card
+            ])).values()];
           }
           console.log('[useGame] Setting hand:', newHand, 'for player:', prev.currentPlayerId);
           
@@ -92,15 +118,20 @@ export const useGame = () => {
           let updatedHand = [...prev.hand];
           if (data.play.playerId === prev.currentPlayerId) {
             updatedHand = updatedHand.filter(card => 
-              card.suit !== data.play.card.suit || 
-              card.value !== data.play.card.value
+              !(card.suit === data.play.card.suit && card.value === data.play.card.value)
             );
           }
+
+          // Ensure no duplicates in played cards
+          const uniquePlayedCards = [...new Map(updatedPlayedCards.map(play => [
+            `${play.playerId}-${play.card.suit}-${play.card.value}`,
+            play
+          ])).values()];
           
           return {
             ...prev,
             hand: updatedHand,
-            playedCards: updatedPlayedCards,
+            playedCards: uniquePlayedCards,
             currentPlayer: data.nextPlayer
           };
         });
@@ -219,6 +250,7 @@ export const useGame = () => {
             ...prev,
             gameCode: response.gameCode,
             currentPlayerId: response.player.id,
+            hostId: response.player.id,
             players: [response.player],
             gameStatus: 'waiting'
           }));
@@ -248,6 +280,7 @@ export const useGame = () => {
             ...prev,
             gameCode: response.gameCode,
             currentPlayerId: response.player.id,
+            hostId: response.hostId,
             players: response.players || [response.player],
             gameStatus: 'waiting'
           }));

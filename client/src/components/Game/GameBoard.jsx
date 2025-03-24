@@ -8,14 +8,20 @@ import { PlayedCards } from './PlayedCards';
 import { GameToast } from './GameToast';
 import { GameOver } from './GameOver';
 
+// Helper function to get player avatar URL
+const getPlayerAvatar = (playerId) => {
+  return `https://api.dicebear.com/7.x/avataaars/svg?seed=${playerId}&size=50`;
+};
+
 export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage }) => {
-  const { players, currentPlayer, playedCards, hand } = gameState;
+  const { players, currentPlayer, playedCards, hand, trickNumber } = gameState;
   const [toast, setToast] = useState(null);
-  const [toastId, setToastId] = useState(0); // Add a unique ID for toasts
+  const [toastId, setToastId] = useState(0);
+  const [hoveredCard, setHoveredCard] = useState(null);
 
   const showToast = (message) => {
     setToast(message);
-    setToastId(prev => prev + 1); // Increment toast ID to ensure uniqueness
+    setToastId(prev => prev + 1);
   };
 
   const handlePlayCard = (card) => {
@@ -25,6 +31,18 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage }) =>
 
   return (
     <div className="min-h-screen bg-green-900 p-4">
+      {/* Game Status Bar */}
+      <div className="bg-green-800 rounded-lg p-2 mb-4 flex justify-between items-center">
+        <div className="text-white">
+          <span className="font-bold">Trick {trickNumber + 1}</span>
+          <span className="mx-2">•</span>
+          <span>{playedCards.length}/4 cards played</span>
+        </div>
+        <div className="text-yellow-300 font-bold">
+          Target: {gameState.targetScore || 75} points
+        </div>
+      </div>
+
       <div className="grid grid-cols-12 gap-4 h-full">
         {/* Left sidebar - Scoreboard */}
         <div className="col-span-3">
@@ -33,14 +51,6 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage }) =>
             scores={gameState.scores}
             currentPlayerId={gameState.currentPlayerId}
           />
-          
-          {/* Target score display */}
-          <div className="bg-green-800 rounded-lg p-4 shadow-lg mt-4">
-            <h2 className="text-white text-xl font-bold mb-2 text-center">Target Score</h2>
-            <div className="text-2xl font-bold text-yellow-300 text-center">
-              {gameState.targetScore || 75} points
-            </div>
-          </div>
         </div>
 
         {/* Main game area */}
@@ -57,12 +67,29 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage }) =>
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5 }}
                 >
-                  <div className={`mb-2 text-xl font-bold ${player.id === currentPlayer ? 'text-yellow-300' : ''}`}>
-                    {player.name}
-                    {player.id === currentPlayer && ' (Current Turn)'}
-                  </div>
-                  <div className="bg-green-800 p-4 rounded-lg">
-                    <div className="text-sm">Cards: {player.handSize || 0}</div>
+                  <div className="text-white text-center">
+                    <div className="relative mb-2 flex flex-col items-center">
+                      <motion.div
+                        className="w-8 h-8 rounded-full overflow-hidden border-2 border-transparent"
+                        animate={{
+                          scale: player.id === currentPlayer ? 1.1 : 1,
+                          rotate: player.id === currentPlayer ? 5 : 0
+                        }}
+                        transition={{ duration: 0.3 }}
+                      >
+                        <img
+                          src={getPlayerAvatar(player.id)}
+                          alt={player.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </motion.div>
+                      <div className={`mt-1 text-base font-bold ${player.id === currentPlayer ? 'text-yellow-300' : ''}`}>
+                        {player.name}
+                      </div>
+                    </div>
+                    <div className="bg-green-800 p-2 rounded-lg">
+                      <div className="text-xs">Cards: {player.handSize || 0}</div>
+                    </div>
                   </div>
                 </motion.div>
               ))}
@@ -70,16 +97,27 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage }) =>
 
           {/* Center area with current played card */}
           <div className="flex-1 flex items-center justify-center">
-            <div className="bg-green-800 p-8 rounded-lg min-w-[300px] min-h-[200px] flex items-center justify-center">
+            <div className="bg-green-800 p-8 rounded-lg min-w-[300px] min-h-[200px] flex items-center justify-center relative">
               <AnimatePresence mode="popLayout">
                 {playedCards.length > 0 ? (
-                  <Card
+                  <motion.div
                     key={`played-${playedCards[playedCards.length - 1].playerId}-${playedCards[playedCards.length - 1].card.suit}-${playedCards[playedCards.length - 1].card.value}`}
-                    suit={playedCards[playedCards.length - 1].card.suit}
-                    value={playedCards[playedCards.length - 1].card.value}
-                    disabled
-                    animate="played"
-                  />
+                    initial={{ scale: 0.5, opacity: 0, y: 50 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    exit={{ scale: 0.5, opacity: 0, y: -50 }}
+                    transition={{ duration: 0.3 }}
+                    className="relative"
+                  >
+                    <Card
+                      suit={playedCards[playedCards.length - 1].card.suit}
+                      value={playedCards[playedCards.length - 1].card.value}
+                      disabled
+                      animate="played"
+                    />
+                    <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 text-white text-sm">
+                      {players.find(p => p.id === playedCards[playedCards.length - 1].playerId)?.name}
+                    </div>
+                  </motion.div>
                 ) : (
                   <motion.div
                     key="no-cards"
@@ -98,13 +136,17 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage }) =>
           <div className="w-full mt-8">
             <div className="text-center mb-4">
               <motion.div
-                className={`text-xl font-bold ${gameState.currentPlayer === gameState.currentPlayerId ? 'text-yellow-300' : 'text-white'}`}
+                className={`text-xl font-bold px-4 py-2 ${gameState.currentPlayer === gameState.currentPlayerId ? 'text-yellow-300' : 'text-white'}`}
                 initial={{ scale: 1 }}
-                animate={{ scale: gameState.currentPlayer === gameState.currentPlayerId ? 1.1 : 1 }}
+                animate={{ 
+                  scale: gameState.currentPlayer === gameState.currentPlayerId ? 1.1 : 1,
+                  y: gameState.currentPlayer === gameState.currentPlayerId ? -5 : 0
+                }}
                 transition={{ 
-                  duration: 0.5, 
+                  duration: 1.5, 
                   repeat: gameState.currentPlayer === gameState.currentPlayerId ? Infinity : 0, 
-                  repeatType: "reverse"
+                  repeatType: "reverse",
+                  repeatDelay: 1
                 }}
               >
                 {gameState.currentPlayer === gameState.currentPlayerId ? 'Your Turn!' : 'Waiting for other player...'}
@@ -114,6 +156,8 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage }) =>
               cards={hand}
               onPlayCard={handlePlayCard}
               isActive={gameState.currentPlayer === gameState.currentPlayerId}
+              hoveredCard={hoveredCard}
+              onCardHover={setHoveredCard}
             />
           </div>
         </div>
