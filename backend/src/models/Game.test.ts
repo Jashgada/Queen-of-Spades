@@ -1,269 +1,174 @@
+import { Card, Player } from '../types';
 import { Game } from './Game';
-import { Card } from '../types';
 
-describe('Game', () => {
-  let game: Game;
+const makeGame = (playerCount = 2) => {
+  const game = new Game('game1');
+  const players: Player[] = [];
+  for (let index = 0; index < playerCount; index += 1) {
+    players.push(game.addPlayer(`Player ${index + 1}`, `socket-${index + 1}`));
+  }
+  game.start();
+  return { game, players };
+};
 
-  beforeEach(() => {
-    game = new Game('test123');
-  });
-
-  test('should create a game with initial state', () => {
-    const state = game.getState();
-    expect(state.code).toBe('test123');
-    expect(state.players).toEqual([]);
-    expect(state.status).toBe('waiting');
-    expect(state.currentTrick).toEqual([]);
-    expect(state.tricks).toEqual([]);
-    expect(state.trickNumber).toBe(0);
-    expect(state.currentPlayer).toBeNull();
-    expect(state.scores).toEqual({});
-    expect(state.targetScore).toBe(75);
-    expect(state.gameOver).toBe(false);
-    expect(state.winner).toBeNull();
-    expect(state.lastTrick).toBeNull();
-  });
-
-  test('should add a player to the game', () => {
-    const player = game.addPlayer('Player 1', 'socket123');
+describe('Game bidding and contract phases', () => {
+  test('deals cards and opens bidding at 75 with the next player to act', () => {
+    const { game, players } = makeGame();
     const state = game.getState();
 
-    expect(player.name).toBe('Player 1');
-    expect(player.socketId).toBe('socket123');
-    expect(player.handSize).toBe(0);
-    expect(state.players).toHaveLength(1);
-    expect(state.players[0]).toEqual(player);
-    expect(state.hands[player.id]).toEqual([]);
-    expect(state.scores[player.id]).toBe(0);
+    expect(state.status).toBe('bidding');
+    expect(state.currentBid).toBe(75);
+    expect(state.currentBidder).toBe(players[0].id);
+    expect(state.currentPlayer).toBe(players[1].id);
+    expect(state.bidHistory).toEqual([{ playerId: players[0].id, type: 'bid', amount: 75 }]);
+    expect(Object.values(state.hands).flat()).toHaveLength(52);
   });
 
-  test('should remove a player from the game', () => {
-    const player = game.addPlayer('Player 1', 'socket123');
-    game.removePlayer(player.id);
-    const state = game.getState();
+  test.each([3, 5, 6])('deals %i-player hands evenly without removing spades or scoring cards', playerCount => {
+    const { game } = makeGame(playerCount);
+    const dealtCards = Object.values(game.getState().hands).flat();
+    const missingCards = [
+      ...['hearts', 'diamonds', 'clubs', 'spades'].flatMap(suit =>
+        ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'].map(value => ({ suit, value }))
+      )
+    ].filter(card => !dealtCards.some(dealt => dealt.suit === card.suit && dealt.value === card.value));
 
-    expect(state.players).toHaveLength(0);
-    expect(state.hands[player.id]).toBeUndefined();
-    expect(state.scores[player.id]).toBeUndefined();
+    expect(new Set(Object.values(game.getState().hands).map(hand => hand.length)).size).toBe(1);
+    expect(missingCards).toHaveLength(52 % playerCount);
+    expect(missingCards.every(card => card.suit !== 'spades')).toBe(true);
+    expect(missingCards.every(card => !['5', '10', 'A'].includes(card.value) && !(card.suit === 'spades' && card.value === 'Q'))).toBe(true);
   });
 
-  test('should start the game with at least 2 players', () => {
-    game.addPlayer('Player 1', 'socket1');
-    game.addPlayer('Player 2', 'socket2');
-    game.start();
-    const state = game.getState();
+  test('validates raises, advances clockwise, and closes after all other bidders pass', () => {
+    const { game, players } = makeGame(3);
 
-    expect(state.status).toBe('playing');
-    expect(state.currentPlayer).toBe(state.players[0].id);
-    expect(state.trickNumber).toBe(1);
-    
-    // Check that cards were dealt
-    state.players.forEach(player => {
-      expect(state.hands[player.id].length).toBeGreaterThan(0);
-      expect(player.handSize).toBeGreaterThan(0);
+    expect(game.submitBid(players[2].id, 80)).toEqual({ success: false, message: 'It is not your turn to bid' });
+    expect(game.submitBid(players[1].id, 76).success).toBe(false);
+    expect(game.submitBid(players[1].id, 155).success).toBe(false);
+    expect(game.submitBid(players[1].id, 80).success).toBe(true);
+    expect(game.getState().currentBidder).toBe(players[1].id);
+    expect(game.getState().currentPlayer).toBe(players[2].id);
+
+    expect(game.submitBid(players[2].id, null).success).toBe(true);
+    expect(game.getState().currentPlayer).toBe(players[0].id);
+    expect(game.submitBid(players[0].id, null).success).toBe(true);
+    expect(game.getState().status).toBe('contract');
+    expect(game.getState().currentPlayer).toBe(players[1].id);
+    expect(game.getState().currentBid).toBe(80);
+  });
+
+  test('allows two-player contracts without partner calls', () => {
+    const { game, players } = makeGame();
+    expect(game.submitBid(players[1].id, null).success).toBe(true);
+    expect(game.getState().status).toBe('contract');
+
+    expect(game.submitContract(players[0].id, [], 'spades').success).toBe(true);
+    expect(game.getState().status).toBe('playing');
+    expect(game.getState().currentPlayer).toBe(players[0].id);
+    expect(game.getState().contract?.partnerCalls).toEqual([]);
+  });
+
+  test('requires the configured number of partner calls and distinct partner owners', () => {
+    const { game, players } = makeGame(4);
+    for (const player of players.slice(1)) game.submitBid(player.id, null);
+
+    const bidder = players[0];
+    const calledCard: Card = { suit: 'hearts', value: 'A' };
+    game.getState().hands[bidder.id] = [{ suit: 'clubs', value: '2' }];
+    game.getState().hands[players[1].id] = [calledCard, { suit: 'diamonds', value: '2' }];
+    game.getState().hands[players[2].id] = [{ suit: 'spades', value: '2' }];
+    game.getState().hands[players[3].id] = [{ suit: 'clubs', value: '3' }];
+
+    expect(game.submitContract(bidder.id, [], 'spades').success).toBe(false);
+    expect(game.submitContract(bidder.id, [calledCard], 'spades').success).toBe(true);
+    expect(game.getPublicState().contract?.revealedPartnerIds).toEqual([]);
+    expect(game.getPublicState().players[0]).not.toHaveProperty('socketId');
+
+    game.getState().currentPlayer = players[1].id;
+    const result = game.playCard(players[1].id, calledCard);
+    expect(result.valid).toBe(true);
+    expect(game.getState().contract?.revealedPartnerIds).toContain(players[1].id);
+  });
+
+  test('requires players to follow suit and lets the declared cut suit trump', () => {
+    const { game, players } = makeGame();
+    game.submitBid(players[1].id, null);
+    game.submitContract(players[0].id, [], 'spades');
+    const state = game.getState();
+    state.hands[players[0].id] = [{ suit: 'hearts', value: '5' }];
+    state.hands[players[1].id] = [{ suit: 'hearts', value: '2' }, { suit: 'spades', value: 'A' }];
+    state.players.forEach(player => { player.handSize = state.hands[player.id].length; });
+
+    expect(game.playCard(players[0].id, { suit: 'hearts', value: '5' }).valid).toBe(true);
+    expect(game.playCard(players[1].id, { suit: 'spades', value: 'A' })).toMatchObject({
+      valid: false,
+      message: 'Must follow suit'
     });
-  });
 
-  test('should not start the game with less than 2 players', () => {
-    game.addPlayer('Player 1', 'socket1');
-    
-    expect(() => {
-      game.start();
-    }).toThrow('Not enough players to start the game');
-  });
-
-  test('should play a card and validate the move', () => {
-    // Setup a game with 2 players
-    const player1 = game.addPlayer('Player 1', 'socket1');
-    const player2 = game.addPlayer('Player 2', 'socket2');
-    
-    // Manually set up hands for testing
-    const state = game.getState();
-    state.hands[player1.id] = [
-      { suit: 'hearts', value: '5' },
-      { suit: 'diamonds', value: '10' }
-    ];
-    state.hands[player2.id] = [
-      { suit: 'hearts', value: 'A' },
-      { suit: 'spades', value: 'Q' }
-    ];
-    state.players[0].handSize = 2;
-    state.players[1].handSize = 2;
-    
-    // Start the game and set current player
-    state.status = 'playing';
-    state.currentPlayer = player1.id;
-    state.trickNumber = 1;
-    
-    // Play a card
-    const result = game.playCard(player1.id, { suit: 'hearts', value: '5' });
-    
-    // The result should be valid
-    expect(result.valid).toBe(true);
-    expect(result.nextPlayer).toBe(player2.id);
-    
-    // Check game state
-    expect(state.currentTrick).toHaveLength(1);
-    expect(state.currentTrick[0].playerId).toBe(player1.id);
-    expect(state.currentTrick[0].card).toEqual({ suit: 'hearts', value: '5' });
-    expect(state.hands[player1.id]).toHaveLength(1);
-    expect(state.players[0].handSize).toBe(1);
-    expect(state.currentPlayer).toBe(player2.id);
-  });
-
-  test('should validate following suit', () => {
-    // Setup a game with 2 players
-    const player1 = game.addPlayer('Player 1', 'socket1');
-    const player2 = game.addPlayer('Player 2', 'socket2');
-    
-    // Manually set up hands for testing
-    const state = game.getState();
-    state.hands[player1.id] = [
-      { suit: 'hearts', value: '5' }
-    ];
-    state.hands[player2.id] = [
-      { suit: 'hearts', value: 'A' },
-      { suit: 'spades', value: 'Q' }
-    ];
-    state.players[0].handSize = 1;
-    state.players[1].handSize = 2;
-    
-    // Start the game and set current player
-    state.status = 'playing';
-    state.currentPlayer = player1.id;
-    state.trickNumber = 1;
-    
-    // Player 1 plays a heart
-    game.playCard(player1.id, { suit: 'hearts', value: '5' });
-    
-    // Player 2 tries to play a spade (should fail because they have a heart)
-    const invalidResult = game.playCard(player2.id, { suit: 'spades', value: 'Q' });
-    
-    expect(invalidResult.valid).toBe(false);
-    expect(invalidResult.message).toBe('Must follow suit');
-    
-    // Player 2 plays a heart (should succeed)
-    const validResult = game.playCard(player2.id, { suit: 'hearts', value: 'A' });
-    
-    expect(validResult.valid).toBe(true);
-    expect(validResult.trickComplete).toBe(true);
-    expect(validResult.trickWinner).toBe(player2.id);
-    expect(validResult.trickPoints).toBe(20); // 5 + 15 points
-  });
-
-  test('should complete a trick and award points', () => {
-    // Setup a game with 2 players
-    const player1 = game.addPlayer('Player 1', 'socket1');
-    const player2 = game.addPlayer('Player 2', 'socket2');
-    
-    // Manually set up hands for testing
-    const state = game.getState();
-    state.hands[player1.id] = [
-      { suit: 'hearts', value: '5' }
-    ];
-    state.hands[player2.id] = [
-      { suit: 'hearts', value: 'A' }
-    ];
-    state.players[0].handSize = 1;
+    // This hand has no hearts, so the spade cut is legal and wins the round.
+    state.hands[players[1].id] = [{ suit: 'spades', value: 'A' }];
     state.players[1].handSize = 1;
-    
-    // Start the game and set current player
-    state.status = 'playing';
-    state.currentPlayer = player1.id;
-    state.trickNumber = 1;
-    
-    // Player 1 plays a 5 of hearts (5 points)
-    game.playCard(player1.id, { suit: 'hearts', value: '5' });
-    
-    // Player 2 plays an Ace of hearts (15 points)
-    const result = game.playCard(player2.id, { suit: 'hearts', value: 'A' });
-    
-    expect(result.valid).toBe(true);
-    expect(result.trickComplete).toBe(true);
-    expect(result.trickWinner).toBe(player2.id);
-    expect(result.trickPoints).toBe(20); // 5 + 15 points
-    
-    // Check that the scores were updated
-    expect(state.scores[player2.id]).toBe(20);
-    expect(state.tricks).toHaveLength(1);
-    expect(state.lastTrick).toEqual({ winner: player2.id, points: 20 });
-    expect(state.currentTrick).toHaveLength(0);
-    expect(state.trickNumber).toBe(2);
-    expect(state.currentPlayer).toBe(player2.id);
+    const result = game.playCard(players[1].id, { suit: 'spades', value: 'A' });
+    expect(result).toMatchObject({ valid: true, roundComplete: true, roundWinner: players[1].id });
   });
 
-  test('should end the game when a player reaches the target score', () => {
-    // Setup a game with 2 players and a low target score
-    game = new Game('test123', 20);
-    const player1 = game.addPlayer('Player 1', 'socket1');
-    const player2 = game.addPlayer('Player 2', 'socket2');
-    
-    // Manually set up hands for testing
-    const state = game.getState();
-    state.hands[player1.id] = [
-      { suit: 'hearts', value: '5' }
-    ];
-    state.hands[player2.id] = [
-      { suit: 'spades', value: 'Q' }
-    ];
-    state.players[0].handSize = 1;
-    state.players[1].handSize = 1;
-    
-    // Start the game and set current player
-    state.status = 'playing';
-    state.currentPlayer = player1.id;
-    state.trickNumber = 1;
-    
-    // Player 1 plays a 5 of hearts (5 points)
-    game.playCard(player1.id, { suit: 'hearts', value: '5' });
-    
-    // Player 2 plays a Queen of spades (30 points)
-    const result = game.playCard(player2.id, { suit: 'spades', value: 'Q' });
-    
-    expect(result.valid).toBe(true);
-    expect(result.trickComplete).toBe(true);
-    expect(result.trickWinner).toBe(player1.id);
-    expect(result.trickPoints).toBe(35); // 5 + 30 points
-    
-    // Check that the game is over
-    expect(state.scores[player1.id]).toBe(35);
-    expect(state.gameOver).toBe(true);
-    expect(state.winner).toBe(player1.id);
-    expect(state.status).toBe('finished');
+  test('evaluates the bid at deal end and records positive or negative contract points', () => {
+    const successful = makeGame();
+    successful.game.submitBid(successful.players[1].id, null);
+    successful.game.submitContract(successful.players[0].id, [], 'spades');
+    const successState = successful.game.getState();
+    successState.contract!.bid = 5;
+    successState.hands[successful.players[0].id] = [{ suit: 'hearts', value: '5' }];
+    successState.hands[successful.players[1].id] = [{ suit: 'hearts', value: '2' }];
+    successState.players.forEach(player => { player.handSize = 1; });
+
+    successful.game.playCard(successful.players[0].id, { suit: 'hearts', value: '5' });
+    const successResult = successful.game.playCard(successful.players[1].id, { suit: 'hearts', value: '2' });
+    expect(successResult.contractResult).toMatchObject({ successful: true, signedPoints: 5 });
+    expect(successState.winningTeamPlayerIds).toEqual([successful.players[0].id]);
+
+    const failed = makeGame();
+    failed.game.submitBid(failed.players[1].id, null);
+    failed.game.submitContract(failed.players[0].id, [], 'spades');
+    const failedState = failed.game.getState();
+    failedState.hands[failed.players[0].id] = [{ suit: 'hearts', value: '5' }];
+    failedState.hands[failed.players[1].id] = [{ suit: 'hearts', value: '2' }];
+    failedState.players.forEach(player => { player.handSize = 1; });
+
+    failed.game.playCard(failed.players[0].id, { suit: 'hearts', value: '5' });
+    const failedResult = failed.game.playCard(failed.players[1].id, { suit: 'hearts', value: '2' });
+    expect(failedResult.contractResult).toMatchObject({ successful: false, signedPoints: -75 });
+    expect(failedState.winningTeamPlayerIds).toEqual([failed.players[1].id]);
   });
 
-  test('should restart the game with the same players', () => {
-    // Setup a game with 2 players
-    const player1 = game.addPlayer('Player 1', 'socket1');
-    const player2 = game.addPlayer('Player 2', 'socket2');
-    
-    // Start the game
-    game.start();
-    
-    // Play some cards and end the game
+  test('counts called partners in the bidder team’s contract points', () => {
+    const { game, players } = makeGame(3);
+    game.submitBid(players[1].id, null);
+    game.submitBid(players[2].id, null);
+
+    const calledPartnerCard: Card = { suit: 'hearts', value: 'A' };
     const state = game.getState();
-    state.gameOver = true;
-    state.winner = player1.id;
-    state.status = 'finished';
-    state.scores[player1.id] = 100;
-    
-    // Restart the game
-    game.restart();
-    const newState = game.getState();
-    
-    expect(newState.status).toBe('playing');
-    expect(newState.players).toEqual(state.players);
-    expect(newState.gameOver).toBe(false);
-    expect(newState.winner).toBeNull();
-    expect(newState.scores[player1.id]).toBe(0);
-    expect(newState.scores[player2.id]).toBe(0);
-    expect(newState.trickNumber).toBe(1);
-    expect(newState.currentPlayer).toBe(player1.id);
-    
-    // Check that cards were dealt
-    newState.players.forEach(player => {
-      expect(newState.hands[player.id].length).toBeGreaterThan(0);
-      expect(player.handSize).toBeGreaterThan(0);
-    });
+    state.hands[players[0].id] = [{ suit: 'hearts', value: '5' }];
+    state.hands[players[1].id] = [calledPartnerCard];
+    state.hands[players[2].id] = [{ suit: 'hearts', value: '2' }];
+    state.players.forEach(player => { player.handSize = 1; });
+
+    expect(game.submitContract(players[0].id, [calledPartnerCard], 'spades').success).toBe(true);
+    state.contract!.bid = 20;
+
+    game.playCard(players[0].id, { suit: 'hearts', value: '5' });
+    game.playCard(players[1].id, calledPartnerCard);
+    const result = game.playCard(players[2].id, { suit: 'hearts', value: '2' });
+
+    expect(result.contractResult).toMatchObject({ bidderTeamPoints: 20, successful: true, signedPoints: 20 });
+    expect(state.winningTeamPlayerIds).toEqual([players[0].id, players[1].id]);
   });
-}); 
+
+  test.each([
+    [2, 0], [3, 1], [4, 1], [5, 2], [6, 2]
+  ])('requires %i-player contracts to call %i partner cards', (playerCount, requiredCalls) => {
+    const { game, players } = makeGame(playerCount as number);
+    for (const player of players.slice(1)) game.submitBid(player.id, null);
+    expect(game.submitContract(players[0].id, [], 'diamonds').success).toBe(requiredCalls === 0);
+  });
+});

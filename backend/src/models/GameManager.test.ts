@@ -72,9 +72,9 @@ describe('GameManager', () => {
     expect(result.game).toBeDefined();
     
     const gameState = result.game!.getState();
-    expect(gameState.status).toBe('playing');
+    expect(gameState.status).toBe('bidding');
     expect(gameState.currentPlayer).toBeDefined();
-    expect(gameState.trickNumber).toBe(1);
+    expect(gameState.roundNumber).toBe(0);
   });
 
   test('should not start a game with insufficient players', () => {
@@ -95,9 +95,11 @@ describe('GameManager', () => {
     const player2 = joinResult.player!;
     
     gameManager.startGame(gameCode);
+    const game = gameManager.getGame(gameCode)!;
+    game.submitBid(player2.id, null);
+    game.submitContract(player1.id, [], 'spades');
     
     // Get the game and manually set up hands for testing
-    const game = gameManager.getGame(gameCode)!;
     const state = game.getState();
     
     // Set player 1 as current player
@@ -123,9 +125,9 @@ describe('GameManager', () => {
     expect(result.result.nextPlayer).toBe(player2.id);
     
     // Check game state
-    expect(state.currentTrick).toHaveLength(1);
-    expect(state.currentTrick[0].playerId).toBe(player1.id);
-    expect(state.currentTrick[0].card).toEqual({ suit: 'hearts', value: '5' });
+    expect(state.currentRound).toHaveLength(1);
+    expect(state.currentRound[0].playerId).toBe(player1.id);
+    expect(state.currentRound[0].card).toEqual({ suit: 'hearts', value: '5' });
     expect(state.hands[player1.id]).toHaveLength(0);
     expect(state.players[0].handSize).toBe(0);
     expect(state.currentPlayer).toBe(player2.id);
@@ -159,10 +161,10 @@ describe('GameManager', () => {
     
     // Check game state
     const newState = result.game!.getState();
-    expect(newState.status).toBe('playing');
+    expect(newState.status).toBe('bidding');
     expect(newState.gameOver).toBe(false);
     expect(newState.winner).toBeNull();
-    expect(newState.trickNumber).toBe(1);
+    expect(newState.roundNumber).toBe(0);
     expect(newState.currentPlayer).toBeDefined();
   });
 

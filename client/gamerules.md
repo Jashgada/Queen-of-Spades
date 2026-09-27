@@ -1,35 +1,36 @@
 # Queen of Spades - Game Rules
 
-## Basic Rules
-- Players take turns playing cards
-- First player can play any card
-- Subsequent players must follow suit if possible
-- If a player cannot follow suit, they can play any card
-- The highest card of the led suit wins the trick
+## Players and Deal
+- Tables support 2–6 players; 4–6 are recommended.
+- Each deal uses a shuffled standard 52-card deck, dealt as evenly as possible.
+- If 52 cards do not divide evenly, random low-value, zero-point non-spades are set aside to make equal hands. Spades and all scoring cards remain in play.
+- A deal starts with the Bidding Phase and ends after every card has been played.
 
-## Trick Definition
-A "trick" consists of one card played by each player in the game. The first player leads with any card, and other players must follow suit if possible. Once all players have played a card, the trick is complete. The player who played the highest card of the led suit wins the trick and leads the next one.
+## Bidding Phase
+- The first player opens at 75 points.
+- Players act clockwise and may raise by at least 5 points, using multiples of 5, up to 150, or pass.
+- Passing is permanent for the rest of the auction. The last active bidder wins the contract.
+- The winning bid is the target for the bidder's team for this deal.
 
-## Point System
-Points are awarded for specific cards:
-- Five (5) is worth 5 points
-- Ten (10) is worth 10 points
-- Ace (A) is worth 15 points
-- Queen of Spades (Q♠) is worth 30 points
+## Contract Setup
+- The winning bidder calls exact partner cards: none with 2 players, one with 3–4, and two with 5–6.
+- The caller cannot call a card in their own hand, and each call must belong to a different player.
+- The identity of each called partner stays hidden until they play the called card.
+- The bidder declares one cut suit, which acts as trump.
 
-The player who wins a trick collects all the cards played in that trick and adds any points from those cards to their score.
+## Rounds and Cut Suit
+- A round consists of one card played by each player.
+- The bidder leads the first round. The winner of each round leads the next one.
+- Players must follow the suit led if possible.
+- A player may play the cut suit only when they cannot follow the led suit.
+- The highest cut-suit card wins if one is played; otherwise, the highest card of the led suit wins.
 
-## Winning Condition
-The goal is to reach a target score (minimum 75 points). The first player to reach or exceed the target score wins the game.
-
-## Number of Players
-- Minimum: 2 players (for testing purposes)
-- Maximum: 6 players
-- Recommended: 4 players
-
-## Game Flow
-1. Cards are dealt evenly among all players
-2. First player leads with any card
-3. Players take turns playing cards, following suit if possible
-4. The winner of each trick leads the next one
-5. Game continues until all cards are played or a player reaches the target score
+## Card Points and Contract Result
+- Five (5): 5 points
+- Ten (10): 10 points
+- Ace (A): 15 points
+- Queen of Spades (Q♠): 30 points
+- All other cards: 0 points
+- The bidder's team meets its contract by collecting at least the bid amount.
+- A successful contract awards the bidder's team the bid amount. A failed contract subtracts the bid amount from that team, and the defending team wins the deal.
+- Scores do not carry over between deals yet.

@@ -40,6 +40,21 @@ export const gameService = {
     // Use the exact format from test.html
     socket.emit('game:start', callback);
   },
+
+  placeBid: (amount, callback) => {
+    if (!socket.connected) socket.connect();
+    socket.emit('game:bid', { amount }, callback);
+  },
+
+  passBid: (callback) => {
+    if (!socket.connected) socket.connect();
+    socket.emit('game:pass', callback);
+  },
+
+  setContract: (partnerCalls, cutSuit, callback) => {
+    if (!socket.connected) socket.connect();
+    socket.emit('game:setContract', { partnerCalls, cutSuit }, callback);
+  },
   
   // Play a card
   playCard: (playerId, card, callback) => {
@@ -68,4 +83,4 @@ export const gameService = {
   }
 };
 
-export default gameService; 
+export default gameService;

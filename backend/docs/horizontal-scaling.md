@@ -128,12 +128,12 @@ To implement this architecture, we need to refactor our current implementation:
        this.redisClient = redisClient;
      }
      
-     async createGame(playerName: string, socketId: string, targetScore: number = 75): Promise<{ 
+     async createGame(playerName: string, socketId: string): Promise<{
        gameCode: string; 
        player: Player;
      }> {
        const gameCode = nanoid(6);
-       const game = new Game(gameCode, targetScore);
+       const game = new Game(gameCode);
        const player = game.addPlayer(playerName, socketId);
        
        // Store game in Redis
@@ -240,4 +240,4 @@ This architecture provides a robust foundation for handling increased load and e
 3. Update Socket.IO event handlers to work with the new GameManager
 4. Set up Docker Compose for local testing of the scaled architecture
 5. Implement monitoring and logging
-6. Test scaling and failover scenarios 
+6. Test scaling and failover scenarios

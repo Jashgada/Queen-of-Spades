@@ -1,7 +1,11 @@
+export type Suit = 'hearts' | 'diamonds' | 'clubs' | 'spades';
+export type CardValue = '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
+export type GamePhase = 'waiting' | 'bidding' | 'contract' | 'playing' | 'finished';
+
 // Card type
 export interface Card {
-  suit: 'hearts' | 'diamonds' | 'clubs' | 'spades';
-  value: '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | '10' | 'J' | 'Q' | 'K' | 'A';
+  suit: Suit;
+  value: CardValue;
 }
 
 // Player type
@@ -18,35 +22,77 @@ export interface Play {
   card: Card;
 }
 
-// Trick type (a complete round of plays)
-export interface Trick {
+// Round type (one card played by each player)
+export interface Round {
   cards: Play[];
   winner: string;
   points: number;
+}
+
+export interface BidAction {
+  playerId: string;
+  type: 'bid' | 'pass';
+  amount?: number;
+}
+
+export interface Contract {
+  bidderId: string;
+  bid: number;
+  partnerCalls: Card[];
+  cutSuit: Suit;
+  revealedPartnerIds: string[];
+}
+
+export interface ContractResult {
+  bidderId: string;
+  bid: number;
+  bidderTeamPoints: number;
+  successful: boolean;
+  signedPoints: number;
+  winningTeamPlayerIds: string[];
 }
 
 // Game state type
 export interface GameState {
   code: string;
   players: Player[];
-  status: 'waiting' | 'playing' | 'finished';
+  status: GamePhase;
   hands: {
     [playerId: string]: Card[];
   };
-  currentTrick: Play[];
-  tricks: Trick[];
-  trickNumber: number;
+  currentRound: Play[];
+  rounds: Round[];
+  roundNumber: number;
   currentPlayer: string | null;
   scores: {
     [playerId: string]: number;
   };
-  targetScore: number;
   gameOver: boolean;
   winner: string | null;
-  lastTrick: {
+  lastRound: {
     winner: string;
     points: number;
   } | null;
+  currentBid: number | null;
+  currentBidder: string | null;
+  passedPlayers: string[];
+  bidHistory: BidAction[];
+  contract: Contract | null;
+  contractResult: ContractResult | null;
+  winningTeamPlayerIds: string[];
+}
+
+export type PublicGameState = Omit<GameState, 'hands' | 'players'> & {
+  players: Omit<Player, 'socketId'>[];
+};
+
+export interface BidParams {
+  amount: number;
+}
+
+export interface ContractParams {
+  partnerCalls: Card[];
+  cutSuit: Suit;
 }
 
 // Socket event types
@@ -85,9 +131,9 @@ export interface PlayResponse {
     card: Card;
   };
   nextPlayer?: string;
-  trickComplete?: boolean;
-  trickWinner?: string;
-  trickPoints?: number;
+  roundComplete?: boolean;
+  roundWinner?: string;
+  roundPoints?: number;
   scores?: {
     [playerId: string]: number;
   };

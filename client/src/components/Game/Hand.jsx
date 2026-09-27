@@ -2,10 +2,10 @@ import PropTypes from 'prop-types';
 import { motion } from 'framer-motion';
 import { Card } from './Card';
 
-const SUIT_ORDER = ['clubs', 'diamonds', 'hearts', 'spades'];
-const RANK_ORDER = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+const SUIT_ORDER = ['spades', 'hearts', 'clubs', 'diamonds'];
+const RANK_ORDER = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2'];
 
-export const Hand = ({ cards, onPlayCard, isActive, leadSuit }) => {
+export const Hand = ({ cards, onPlayCard, isActive, leadSuit, readOnly }) => {
   const sortedCards = [...cards].sort((cardA, cardB) => {
     const suitDifference = SUIT_ORDER.indexOf(cardA.suit) - SUIT_ORDER.indexOf(cardB.suit);
     if (suitDifference !== 0) return suitDifference;
@@ -49,9 +49,10 @@ export const Hand = ({ cards, onPlayCard, isActive, leadSuit }) => {
               suit={card.suit}
               value={card.value}
               onClick={() => onPlayCard(card)}
-              disabled={!isActive || isUnplayable}
+              disabled={!readOnly && (!isActive || isUnplayable)}
               playable={isPlayable}
               unplayable={isUnplayable}
+              readOnly={readOnly}
               index={index}
               size="hand"
             />
@@ -72,8 +73,10 @@ Hand.propTypes = {
   onPlayCard: PropTypes.func.isRequired,
   isActive: PropTypes.bool,
   leadSuit: PropTypes.oneOf(['hearts', 'diamonds', 'clubs', 'spades']),
+  readOnly: PropTypes.bool,
 };
 
 Hand.defaultProps = {
-  isActive: false
+  isActive: false,
+  readOnly: false
 };

@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { GameManager } from '../models/GameManager';
-import { CreateGameParams, JoinGameParams, PlayCardParams } from '../types';
+import { BidParams, ContractParams, CreateGameParams, JoinGameParams, PlayCardParams } from '../types';
 
 // Create a singleton instance of GameManager
 const gameManager = new GameManager();
@@ -157,28 +157,7 @@ export const setupSocketHandlers = (io: Server) => {
         console.log(`Players in game: ${gameState.players.map(p => `${p.name} (${p.id})`).join(', ')}`);
         console.log(`First player: ${gameState.currentPlayer}`);
 
-        // Send game state to all players
-        io.in(gameCode).emit('game:started', {
-          success: true,
-          gameState: {
-            gameCode,
-            players: gameState.players.map(p => ({
-              id: p.id,
-              name: p.name,
-              handSize: p.handSize
-            })),
-            currentPlayer: gameState.currentPlayer,
-            trickNumber: gameState.trickNumber,
-            scores: gameState.scores,
-            gameOver: gameState.gameOver,
-            winner: gameState.winner,
-            targetScore: gameState.targetScore,
-            status: gameState.status
-          },
-          message: 'Game started successfully'
-        });
-
-        // Send player-specific data to each player
+        // Deliver each private hand before announcing that bidding is open.
         gameState.players.forEach(player => {
           const socketId = player.socketId;
           const playerSocket = io.sockets.sockets.get(socketId);
@@ -190,6 +169,12 @@ export const setupSocketHandlers = (io: Server) => {
               currentPlayerId: player.id
             });
           }
+        });
+
+        io.in(gameCode).emit('game:started', {
+          success: true,
+          gameState: game.getPublicState(),
+          message: 'Game started successfully'
         });
 
         if (callback) {
@@ -209,14 +194,77 @@ export const setupSocketHandlers = (io: Server) => {
       }
     });
 
+    const emitGameState = (gameCode: string, game: ReturnType<typeof gameManager.getGame>, event: string) => {
+      if (!game) return;
+      io.in(gameCode).emit(event, { success: true, gameState: game.getPublicState() });
+    };
+
+    // Handle a raise or pass during the bidding phase.
+    socket.on('game:bid', (params: BidParams, callback) => {
+      const playerInfo = gameManager.findPlayerBySocketId(socket.id);
+      const game = playerInfo ? gameManager.getGame(playerInfo.gameCode) : undefined;
+      if (!playerInfo || !game) {
+        callback?.({ success: false, message: 'Player not found in a game' });
+        return;
+      }
+
+      const result = game.submitBid(playerInfo.playerId, params?.amount);
+      if (!result.success) {
+        callback?.(result);
+        return;
+      }
+
+      emitGameState(playerInfo.gameCode, game, 'game:biddingUpdated');
+      callback?.({ success: true, gameState: game.getPublicState() });
+    });
+
+    socket.on('game:pass', (callback) => {
+      const playerInfo = gameManager.findPlayerBySocketId(socket.id);
+      const game = playerInfo ? gameManager.getGame(playerInfo.gameCode) : undefined;
+      if (!playerInfo || !game) {
+        callback?.({ success: false, message: 'Player not found in a game' });
+        return;
+      }
+
+      const result = game.submitBid(playerInfo.playerId, null);
+      if (!result.success) {
+        callback?.(result);
+        return;
+      }
+
+      emitGameState(playerInfo.gameCode, game, 'game:biddingUpdated');
+      callback?.({ success: true, gameState: game.getPublicState() });
+    });
+
+    // The winning bidder names partner cards and declares the trump (cut) suit.
+    socket.on('game:setContract', (params: ContractParams, callback) => {
+      const playerInfo = gameManager.findPlayerBySocketId(socket.id);
+      const game = playerInfo ? gameManager.getGame(playerInfo.gameCode) : undefined;
+      if (!playerInfo || !game) {
+        callback?.({ success: false, message: 'Player not found in a game' });
+        return;
+      }
+
+      const result = game.submitContract(playerInfo.playerId, params?.partnerCalls || [], params?.cutSuit);
+      if (!result.success) {
+        callback?.(result);
+        return;
+      }
+
+      emitGameState(playerInfo.gameCode, game, 'game:contractSet');
+      callback?.({ success: true, gameState: game.getPublicState() });
+    });
+
     // Handle playing a card
     socket.on('game:playCard', (params: PlayCardParams, callback) => {
       try {
-        const { playerId, card } = params;
+        const playerInfo = gameManager.findPlayerBySocketId(socket.id);
+        const playerId = playerInfo?.playerId;
+        const { card } = params;
 
         // Find the player's game
-        const game = gameManager.getGameByPlayerId(playerId);
-        if (!game) {
+        const game = playerId ? gameManager.getGameByPlayerId(playerId) : undefined;
+        if (!playerId || !game) {
           if (callback) {
             callback({
               success: false,
@@ -250,12 +298,16 @@ export const setupSocketHandlers = (io: Server) => {
             card
           },
           nextPlayer: playResult.nextPlayer,
-          trickComplete: playResult.trickComplete,
-          trickWinner: playResult.trickWinner,
-          trickPoints: playResult.trickPoints,
+          roundComplete: playResult.roundComplete,
+          roundWinner: playResult.roundWinner,
+          roundPoints: playResult.roundPoints,
           scores: gameState.scores,
           gameOver: gameState.gameOver,
           winner: gameState.winner,
+          winningTeamPlayerIds: gameState.winningTeamPlayerIds,
+          contract: gameState.contract,
+          contractResult: gameState.contractResult,
+          roundNumber: gameState.roundNumber,
           message: 'Card played successfully'
         };
 
@@ -267,18 +319,19 @@ export const setupSocketHandlers = (io: Server) => {
         // Broadcast to all players in the game
         io.in(gameCode).emit('game:cardPlayed', responseData);
 
-        // If the trick is complete, emit a trick complete event
-        if (playResult.trickComplete) {
-          console.log(`Trick completed in game ${gameCode}`);
-          console.log(`Trick winner: ${getPlayerNameById(playResult.trickWinner!, gameState.players)}`);
-          console.log(`Points earned: ${playResult.trickPoints}`);
+        // If the round is complete, broadcast the winner and its points.
+        if (playResult.roundComplete) {
+          console.log(`Round completed in game ${gameCode}`);
+          console.log(`Round winner: ${getPlayerNameById(playResult.roundWinner!, gameState.players)}`);
+          console.log(`Points earned: ${playResult.roundPoints}`);
           console.log(`Updated scores: ${JSON.stringify(gameState.scores)}`);
           
-          io.in(gameCode).emit('game:trickComplete', {
-            winner: playResult.trickWinner,
-            points: playResult.trickPoints,
+          io.in(gameCode).emit('game:roundComplete', {
+            winner: playResult.roundWinner,
+            points: playResult.roundPoints,
             scores: gameState.scores,
-            lastTrick: gameState.lastTrick
+            lastRound: gameState.lastRound,
+            roundNumber: gameState.roundNumber
           });
         }
 
@@ -291,6 +344,8 @@ export const setupSocketHandlers = (io: Server) => {
           
           io.in(gameCode).emit('game:over', {
             winner: gameState.winner,
+            winningTeamPlayerIds: gameState.winningTeamPlayerIds,
+            contractResult: gameState.contractResult,
             scores: gameState.scores,
             gameOver: true,
             gameStatus: 'finished'
@@ -344,28 +399,7 @@ export const setupSocketHandlers = (io: Server) => {
         const game = result.game!;
         const gameState = game.getState();
 
-        // Send game state to all players
-        io.in(gameCode).emit('game:restarted', {
-          success: true,
-          gameState: {
-            gameCode,
-            players: gameState.players.map(p => ({
-              id: p.id,
-              name: p.name,
-              handSize: p.handSize
-            })),
-            currentPlayer: gameState.currentPlayer,
-            trickNumber: gameState.trickNumber,
-            scores: gameState.scores,
-            gameOver: gameState.gameOver,
-            winner: gameState.winner,
-            targetScore: gameState.targetScore,
-            status: gameState.status
-          },
-          message: 'Game restarted successfully'
-        });
-
-        // Send player-specific data to each player
+        // Deliver each private hand before announcing that the new bidding phase is open.
         gameState.players.forEach(player => {
           const socketId = player.socketId;
           const playerSocket = io.sockets.sockets.get(socketId);
@@ -376,6 +410,12 @@ export const setupSocketHandlers = (io: Server) => {
               currentPlayerId: player.id
             });
           }
+        });
+
+        io.in(gameCode).emit('game:restarted', {
+          success: true,
+          gameState: game.getPublicState(),
+          message: 'Game restarted successfully'
         });
 
         if (callback) {
@@ -443,4 +483,4 @@ export const setupSocketHandlers = (io: Server) => {
       }
     });
   });
-}; 
+};

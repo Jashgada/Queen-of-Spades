@@ -7,13 +7,13 @@ export class GameManager {
   private playerGameMap: Map<string, string> = new Map(); // Maps player ID to game code
 
   // Create a new game
-  createGame(playerName: string, socketId: string, targetScore: number = 75): { 
+  createGame(playerName: string, socketId: string): {
     gameCode: string; 
     player: Player;
   } {
     // Generate game code and convert to uppercase
     const gameCode = nanoid(6).toUpperCase();
-    const game = new Game(gameCode, targetScore);
+    const game = new Game(gameCode);
     const player = game.addPlayer(playerName, socketId);
 
     this.games.set(gameCode, game);
@@ -80,23 +80,6 @@ export class GameManager {
     result?: any;
     game?: Game;
   } {
-    // For testing purposes, we'll override the validation
-    if (gameCode === 'test123') {
-      const game = this.games.get(gameCode);
-      if (!game) {
-        return { success: false, message: 'Game not found' };
-      }
-
-      const result = game.playCard(playerId, card as any);
-      return { 
-        success: true, 
-        message: 'Card played successfully', 
-        result, 
-        game 
-      };
-    }
-
-    // Normal validation
     const upperGameCode = gameCode.toUpperCase();
     const game = this.findGameByCode(upperGameCode);
 

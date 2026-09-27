@@ -1,16 +1,15 @@
 import PropTypes from 'prop-types';
-export const ScoreBoard = ({ players, scores, currentPlayerId, activePlayerId, targetScore }) => {
+export const ScoreBoard = ({ players, scores, currentPlayerId, activePlayerId, bid }) => {
   return (
     <section className="rounded-2xl border border-white/10 bg-green-900/70 p-4 shadow-lg sm:p-5">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-bold text-white">Scoreboard</h2>
-        <span className="text-xs text-white/60">Target {targetScore}</span>
+        <span className="text-xs text-white/60">Bid target {bid}</span>
       </div>
 
       <ol className="space-y-3">
         {players.map(player => {
           const score = scores[player.id] || 0;
-          const progress = Math.min((score / targetScore) * 100, 100);
           const isCurrentTurn = player.id === activePlayerId;
           const isYou = player.id === currentPlayerId;
 
@@ -27,16 +26,6 @@ export const ScoreBoard = ({ players, scores, currentPlayerId, activePlayerId, t
                   {isCurrentTurn && <p className="mt-0.5 text-xs text-yellow-200">Playing now</p>}
                 </div>
                 <span className="shrink-0 text-xl font-bold tabular-nums text-yellow-300">{score}</span>
-              </div>
-              <div
-                className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/30"
-                role="progressbar"
-                aria-label={`${player.name}'s score`}
-                aria-valuemin={0}
-                aria-valuemax={targetScore}
-                aria-valuenow={Math.min(score, targetScore)}
-              >
-                <div className="h-full rounded-full bg-yellow-300 transition-[width] duration-500" style={{ width: `${progress}%` }} />
               </div>
             </li>
           );
@@ -56,9 +45,9 @@ ScoreBoard.propTypes = {
   scores: PropTypes.object.isRequired,
   currentPlayerId: PropTypes.string,
   activePlayerId: PropTypes.string,
-  targetScore: PropTypes.number,
+  bid: PropTypes.number,
 };
 
 ScoreBoard.defaultProps = {
-  targetScore: 75,
+  bid: 75,
 };

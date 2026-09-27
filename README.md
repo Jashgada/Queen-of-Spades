@@ -62,14 +62,15 @@ This game is called Queen of Spades and is a web-based multiplayer card game. Pl
 Now you should have both the frontend and backend servers running locally for development.
 
 ### How the game works
-The objective of the game is fairly simple. Make the most points. How do you make points? Only 4 cards have points assigned to them - 5s for five points, 10s for 10 points, Aces have 15 points and the Queen of spades has 30 points. If you sum them up, we get a total of 150 points in a deck.
-Once the cards are distributed, players start a bid starting from 75 points with increments in multiple of 5s.
-The highest one can bid is 150 (duh).
-Whoever wins the bid has the goal of making that many points. They can also make 1 or 2 partners (depending on the number of players) based on the cards they need to win the game. For example, a winner of the bid can declare ace of hearts their partner and the player with the card is a partner (unrevealed till they play the card in the game). The partner shares the same objective.
-The winner of the bid will also declare a card shape a “cut” card which we will go into later.
+Tables support 2–6 players, with 4–6 recommended. A deal begins with a Bidding Phase: the first player opens at 75, players bid clockwise in increments of 5 up to 150, or pass. The last player still bidding wins the contract.
 
-Now, the winner of the bid starts the game. During each round, the objective will be to win a hand by playing the highest possible card of the same shape. Whoever wins the round, gets the hand and stacks it in a separate personal stack. All the points in this hand now belong to them.
-All players will play a card in each round, thus the total number of rounds will be the number of cards that are distributed.
+When 52 cards do not divide evenly among the players, enough low-value, zero-point non-spade cards are set aside at random to make equal hands. Spades and all scoring cards stay in play.
+
+The winning bidder calls 0, 1, or 2 exact partner cards (depending on table size: 0 at 2 players, 1 at 3–4, and 2 at 5–6). A called partner stays hidden until they play the called card. The bidder also declares a cut suit, which is trump: a player may cut only when they cannot follow the suit led.
+
+After the contract is set, the bidder leads. A **round** is one card played by each player. Players must follow the suit led when possible; otherwise they may play any card. The highest cut-suit card wins if one was played; otherwise the highest card of the led suit wins. The round winner leads the next round.
+
+The five, ten, ace, and queen of spades are worth 5, 10, 15, and 30 points respectively, for 150 points total in the deck. At the end of the deal, the bidder’s team succeeds by collecting at least the bid. A successful contract earns the bidder’s team the bid amount; a failed contract costs that team the bid amount and the defending team wins. Scores do not carry over between deals yet.
 
 ### Tech Stack
 After some quick research, I have decided on making this app on vanilla js/react for the frontend, use express.js for the backend and socket.io for networking.

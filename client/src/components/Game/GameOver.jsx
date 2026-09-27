@@ -1,103 +1,93 @@
-import React from 'react';
 import PropTypes from 'prop-types';
 import { motion } from 'framer-motion';
 
-export const GameOver = ({ winner, scores, players, currentPlayerId, onRematch, targetScore }) => {
-  const getPlayerName = (playerId) => {
-    const player = players.find(p => p.id === playerId);
-    return player ? player.name : 'Unknown';
-  };
-
-  const isWinner = winner === currentPlayerId;
+export const GameOver = ({ winner, winningTeamPlayerIds, contractResult, scores, players, currentPlayerId, onRematch }) => {
+  const winnerNames = winningTeamPlayerIds.map(playerId => players.find(player => player.id === playerId)?.name || 'Player');
+  const isWinner = winningTeamPlayerIds.includes(currentPlayerId);
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-70 z-50"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-sm"
     >
-      <motion.div
-        initial={{ y: 50 }}
-        animate={{ y: 0 }}
-        transition={{ type: "spring", damping: 15 }}
-        className="bg-green-800 rounded-lg p-8 max-w-md w-full shadow-2xl"
+      <motion.section
+        initial={{ y: 24, scale: 0.96 }}
+        animate={{ y: 0, scale: 1 }}
+        transition={{ type: 'spring', damping: 18 }}
+        className="my-auto w-full max-w-lg rounded-3xl border border-gold/40 bg-felt-dark p-5 shadow-2xl sm:p-8"
+        aria-labelledby="game-over-title"
       >
-        <h2 className="text-3xl font-bold text-center text-white mb-6">
-          Game Over!
-        </h2>
-        
-        <div className="mb-6">
-          <div className="text-xl text-center text-white mb-2">
-            {isWinner ? (
-              <motion.div
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 1, repeat: Infinity }}
-                className="text-yellow-300 font-bold"
-              >
-                You Won! 🏆
-              </motion.div>
-            ) : (
-              <div>
-                <span className="text-yellow-300 font-bold">{getPlayerName(winner)}</span> won the game
-              </div>
-            )}
+        <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-gold-light">Deal complete</p>
+        <h2 id="game-over-title" className="mt-2 text-center text-3xl font-bold text-white">{isWinner ? 'Your team wins!' : 'Contract settled'}</h2>
+        <p className="mt-2 text-center text-sm text-white/65">
+          Winning team: {winnerNames.join(', ') || players.find(player => player.id === winner)?.name || 'Unknown'}
+        </p>
+
+        {contractResult && (
+          <div className={`mt-6 rounded-2xl border p-4 text-center ${contractResult.successful ? 'border-emerald-300/30 bg-emerald-900/30' : 'border-red-300/30 bg-red-900/30'}`}>
+            <p className="text-sm text-white/70">{contractResult.successful ? 'Contract made' : 'Contract failed'}</p>
+            <p className="mt-1 text-3xl font-bold text-gold-light">
+              {contractResult.signedPoints > 0 ? '+' : ''}{contractResult.signedPoints}
+            </p>
+            <p className="mt-1 text-xs text-white/65">
+              Bid {contractResult.bid} · bidder team collected {contractResult.bidderTeamPoints} card points
+            </p>
           </div>
-          <div className="text-center text-white">
-            Target score: {targetScore} points
-          </div>
+        )}
+
+        <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <h3 className="mb-3 text-center text-sm font-semibold uppercase tracking-wider text-white/75">Card points</h3>
+          <ul className="space-y-2">
+            {players.map(player => {
+              const isOnWinningTeam = winningTeamPlayerIds.includes(player.id);
+              return (
+                <li key={player.id} className={`flex items-center justify-between rounded-lg px-3 py-2 ${isOnWinningTeam ? 'bg-gold/15' : 'bg-black/15'}`}>
+                  <span className="text-sm text-white">
+                    {player.name}{player.id === currentPlayerId ? ' (You)' : ''}
+                    {isOnWinningTeam && <span className="ml-2 text-xs text-gold-light">Winner</span>}
+                  </span>
+                  <span className="font-bold tabular-nums text-white">{scores[player.id] || 0}</span>
+                </li>
+              );
+            })}
+          </ul>
         </div>
-        
-        <div className="bg-green-900 rounded-lg p-4 mb-6">
-          <h3 className="text-white text-lg font-bold mb-2 text-center">Final Scores</h3>
-          <div className="space-y-2">
-            {players.map(player => (
-              <div
-                key={player.id}
-                className={`flex justify-between items-center p-2 rounded ${
-                  player.id === winner ? 'bg-yellow-800' : 'bg-green-700'
-                }`}
-              >
-                <div className="text-white">
-                  {player.name}
-                  {player.id === currentPlayerId && ' (You)'}
-                </div>
-                <div className="text-xl font-bold text-white">
-                  {scores[player.id] || 0}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        <div className="flex justify-center">
+
+        <div className="mt-6 flex justify-center">
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
             onClick={onRematch}
-            className="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg"
+            className="rounded-xl bg-gold px-6 py-3 font-bold text-felt-dark shadow-lg transition-colors hover:bg-gold-light"
           >
-            Play Again
+            Deal Again
           </motion.button>
         </div>
-      </motion.div>
+      </motion.section>
     </motion.div>
   );
 };
 
 GameOver.propTypes = {
-  winner: PropTypes.string.isRequired,
+  winner: PropTypes.string,
+  winningTeamPlayerIds: PropTypes.arrayOf(PropTypes.string),
+  contractResult: PropTypes.shape({
+    bid: PropTypes.number,
+    bidderTeamPoints: PropTypes.number,
+    successful: PropTypes.bool,
+    signedPoints: PropTypes.number
+  }),
   scores: PropTypes.object.isRequired,
-  players: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      name: PropTypes.string.isRequired,
-    })
-  ).isRequired,
-  currentPlayerId: PropTypes.string.isRequired,
-  onRematch: PropTypes.func.isRequired,
-  targetScore: PropTypes.number
+  players: PropTypes.arrayOf(PropTypes.shape({
+    id: PropTypes.string.isRequired,
+    name: PropTypes.string.isRequired
+  })).isRequired,
+  currentPlayerId: PropTypes.string,
+  onRematch: PropTypes.func.isRequired
 };
 
 GameOver.defaultProps = {
-  targetScore: 75
-}; 
+  winningTeamPlayerIds: [],
+  contractResult: null
+};

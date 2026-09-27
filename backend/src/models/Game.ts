@@ -1,43 +1,64 @@
 import { nanoid } from 'nanoid';
-import { Card, GameState, Player, Play, Trick } from '../types';
+import {
+  BidAction,
+  Card,
+  CardValue,
+  Contract,
+  ContractResult,
+  GameState,
+  Player,
+  Play,
+  PublicGameState,
+  Round,
+  Suit
+} from '../types';
+
+interface PlayCardResult {
+  valid: boolean;
+  message?: string;
+  nextPlayer?: string;
+  roundComplete?: boolean;
+  roundWinner?: string;
+  roundPoints?: number;
+  gameOver?: boolean;
+  contractResult?: ContractResult | null;
+}
+
+const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
+const VALUES: CardValue[] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+const CARD_RANK: Record<CardValue, number> = {
+  '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
+  J: 11, Q: 12, K: 13, A: 14
+};
 
 export class Game {
   private state: GameState;
+  private partnerPlayerIds: string[] = [];
 
-  constructor(code: string, targetScore: number = 75) {
-    this.state = {
-      code,
-      players: [],
-      status: 'waiting',
-      hands: {},
-      currentTrick: [],
-      tricks: [],
-      trickNumber: 0,
-      currentPlayer: null,
-      scores: {},
-      targetScore,
-      gameOver: false,
-      winner: null,
-      lastTrick: null
-    };
+  constructor(code: string) {
+    this.state = this.createInitialState(code, []);
   }
 
-  // Get the current game state
   getState(): GameState {
     return this.state;
   }
 
-  // Get a player-specific view of the game state (hiding other players' hands)
-  getPlayerView(playerId: string): any {
-    const { hands, ...rest } = this.state;
+  getPublicState(): PublicGameState {
+    const { hands: _hands, players, ...publicState } = this.state;
     return {
-      ...rest,
-      hand: hands[playerId] || [],
+      ...publicState,
+      players: players.map(({ socketId: _socketId, ...player }) => player)
+    };
+  }
+
+  getPlayerView(playerId: string): PublicGameState & { hand: Card[]; currentPlayerId: string } {
+    return {
+      ...this.getPublicState(),
+      hand: this.state.hands[playerId] || [],
       currentPlayerId: playerId
     };
   }
 
-  // Add a player to the game
   addPlayer(name: string, socketId: string): Player {
     const player: Player = {
       id: nanoid(8),
@@ -49,403 +70,429 @@ export class Game {
     this.state.players.push(player);
     this.state.hands[player.id] = [];
     this.state.scores[player.id] = 0;
-
     return player;
   }
 
-  // Remove a player from the game
   removePlayer(playerId: string): void {
-    // Save the list of players before removing one
     const previousPlayers = [...this.state.players];
-    
-    // Remove the player
-    this.state.players = this.state.players.filter(p => p.id !== playerId);
+    this.state.players = this.state.players.filter(player => player.id !== playerId);
     delete this.state.hands[playerId];
     delete this.state.scores[playerId];
+    this.partnerPlayerIds = this.partnerPlayerIds.filter(id => id !== playerId);
 
-    // If no players left, just return
     if (this.state.players.length === 0) {
-      console.log(`Last player ${playerId} removed from game ${this.state.code}. Game is now empty.`);
       this.state.status = 'waiting';
       this.state.currentPlayer = null;
       return;
     }
 
-    // If the game is in progress and the current player left, move to the next player
-    if (this.state.status === 'playing' && this.state.currentPlayer === playerId) {
-      try {
-        this.state.currentPlayer = this.getNextPlayer(playerId, previousPlayers);
-        console.log(`Current player ${playerId} left. New current player: ${this.state.currentPlayer}`);
-      } catch (error) {
-        console.error(`Error getting next player after ${playerId} left:`, error);
-        // If there was an error, just set the current player to the first player
-        if (this.state.players.length > 0) {
-          this.state.currentPlayer = this.state.players[0].id;
-          console.log(`Setting current player to first remaining player: ${this.state.currentPlayer}`);
-        } else {
-          this.state.currentPlayer = null;
-          this.state.status = 'waiting';
-          console.log(`No players left, setting game status to waiting`);
-        }
-      }
+    if (this.state.status === 'bidding' && this.state.currentPlayer === playerId) {
+      this.state.passedPlayers.push(playerId);
+      this.advanceAuction(playerId);
+    } else if (
+      (this.state.status === 'bidding' || this.state.status === 'contract') &&
+      this.state.currentBidder === playerId
+    ) {
+      this.resetAuction();
+    } else if (this.state.status === 'playing' && this.state.currentPlayer === playerId) {
+      this.state.currentPlayer = this.getNextPlayer(playerId, previousPlayers);
     }
   }
 
-  // Start the game
   start(): void {
+    if (this.state.status !== 'waiting') {
+      throw new Error('Game has already started');
+    }
     if (this.state.players.length < 2) {
       throw new Error('Not enough players to start the game');
     }
 
-    this.state.status = 'playing';
+    this.resetDealState();
     this.dealCards();
-    this.state.currentPlayer = this.state.players[0].id;
-    this.state.trickNumber = 1;
+    this.state.status = 'bidding';
+    this.state.currentBid = 75;
+    this.state.currentBidder = this.state.players[0].id;
+    this.state.bidHistory = [{ playerId: this.state.players[0].id, type: 'bid', amount: 75 }];
+    this.state.currentPlayer = this.getNextPlayer(this.state.players[0].id);
   }
 
-  // Deal cards to all players
-  private dealCards(): void {
-    const deck = this.createDeck();
-    this.shuffleDeck(deck);
+  submitBid(playerId: string, amount: number | null): { success: boolean; message?: string } {
+    if (this.state.status !== 'bidding') {
+      return { success: false, message: 'The bidding phase is not active' };
+    }
 
-    const playerCount = this.state.players.length;
-    const cardsPerPlayer = Math.floor(deck.length / playerCount);
+    if (this.state.currentPlayer !== playerId) {
+      return { success: false, message: 'It is not your turn to bid' };
+    }
 
-    // Deal cards evenly
-    this.state.players.forEach((player, index) => {
-      const startIdx = index * cardsPerPlayer;
-      const endIdx = index === playerCount - 1 ? deck.length : startIdx + cardsPerPlayer;
-      this.state.hands[player.id] = deck.slice(startIdx, endIdx);
-      player.handSize = this.state.hands[player.id].length;
+    let action: BidAction;
+    if (amount === null) {
+      action = { playerId, type: 'pass' };
+      this.state.passedPlayers.push(playerId);
+    } else {
+      if (!Number.isInteger(amount) || amount < 75 || amount > 150 || amount % 5 !== 0) {
+        return { success: false, message: 'Bids must be multiples of 5 between 75 and 150' };
+      }
+      if (amount <= (this.state.currentBid || 0)) {
+        return { success: false, message: 'Your bid must be higher than the current bid' };
+      }
+
+      action = { playerId, type: 'bid', amount };
+      this.state.currentBid = amount;
+      this.state.currentBidder = playerId;
+    }
+
+    this.state.bidHistory.push(action);
+    this.advanceAuction(playerId);
+    return { success: true };
+  }
+
+  submitContract(playerId: string, partnerCalls: Card[], cutSuit: Suit): { success: boolean; message?: string } {
+    if (this.state.status !== 'contract' || this.state.currentPlayer !== playerId) {
+      return { success: false, message: 'Only the winning bidder can set the contract' };
+    }
+
+    if (!SUITS.includes(cutSuit)) {
+      return { success: false, message: 'Choose a valid cut suit' };
+    }
+
+    const requiredPartners = this.getRequiredPartners();
+    if (!Array.isArray(partnerCalls)) {
+      return { success: false, message: 'Partner calls must be a list of cards' };
+    }
+    if (partnerCalls.length !== requiredPartners) {
+      return { success: false, message: `You must call ${requiredPartners} partner card${requiredPartners === 1 ? '' : 's'}` };
+    }
+
+    if (partnerCalls.some(card => !card || !SUITS.includes(card.suit) || !VALUES.includes(card.value))) {
+      return { success: false, message: 'Choose valid partner cards' };
+    }
+
+    const callKeys = partnerCalls.map(card => `${card.suit}-${card.value}`);
+    if (new Set(callKeys).size !== callKeys.length) {
+      return { success: false, message: 'Partner calls must be different cards' };
+    }
+
+    for (const card of partnerCalls) {
+      if (this.state.hands[playerId].some(held => held.suit === card.suit && held.value === card.value)) {
+        return { success: false, message: 'You cannot call a card in your own hand' };
+      }
+    }
+
+    const partnerIds = partnerCalls.map(call => {
+      const owner = this.state.players.find(player =>
+        this.state.hands[player.id].some(card => card.suit === call.suit && card.value === call.value)
+      );
+      return owner?.id;
     });
-  }
 
-  // Create a standard 52-card deck
-  private createDeck(): Card[] {
-    const suits: Card['suit'][] = ['hearts', 'diamonds', 'clubs', 'spades'];
-    const values: Card['value'][] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-    const deck: Card[] = [];
-
-    for (const suit of suits) {
-      for (const value of values) {
-        deck.push({ suit, value });
-      }
+    if (partnerIds.some(id => !id || id === playerId)) {
+      return { success: false, message: 'Each partner call must belong to another player' };
+    }
+    if (new Set(partnerIds).size !== partnerIds.length) {
+      return { success: false, message: 'Each partner call must identify a different player' };
     }
 
-    return deck;
-  }
-
-  // Shuffle the deck using Fisher-Yates algorithm
-  private shuffleDeck(deck: Card[]): void {
-    for (let i = deck.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [deck[i], deck[j]] = [deck[j], deck[i]];
-    }
-  }
-
-  // Play a card
-  playCard(playerId: string, card: Card): { 
-    valid: boolean; 
-    message?: string;
-    nextPlayer?: string;
-    trickComplete?: boolean;
-    trickWinner?: string;
-    trickPoints?: number;
-  } {
-    // For testing purposes, we'll override the validation in test mode
-    // This is a workaround for the tests
-    if (this.state.code === 'test123') {
-      // Check if the player has the card
-      const playerHand = this.state.hands[playerId];
-      const cardIndex = playerHand.findIndex(c => c.suit === card.suit && c.value === card.value);
-      
-      if (cardIndex === -1) {
-        return { valid: false, message: 'Card not in hand' };
-      }
-
-      // Check if the player is following suit
-      if (this.state.currentTrick.length > 0) {
-        const leadSuit = this.state.currentTrick[0].card.suit;
-        const hasSuit = playerHand.some(c => c.suit === leadSuit);
-        
-        if (hasSuit && card.suit !== leadSuit) {
-          return { valid: false, message: 'Must follow suit' };
-        }
-      }
-
-      // Remove the card from the player's hand
-      playerHand.splice(cardIndex, 1);
-      this.state.players.find(p => p.id === playerId)!.handSize--;
-
-      // Add the card to the current trick
-      this.state.currentTrick.push({ playerId, card });
-
-      // Check if the trick is complete
-      const trickComplete = this.state.currentTrick.length === this.state.players.length;
-      let nextPlayer = this.getNextPlayer(playerId);
-      let trickWinner: string | undefined;
-      let trickPoints: number | undefined;
-
-      if (trickComplete) {
-        // Resolve the trick
-        const result = this.resolveTrick();
-        trickWinner = result.winner;
-        trickPoints = result.points;
-        nextPlayer = trickWinner;
-
-        // Check if the game is over
-        this.checkGameOver();
-      }
-
-      // Update the current player
-      this.state.currentPlayer = nextPlayer;
-
-      return { 
-        valid: true, 
-        nextPlayer, 
-        trickComplete: trickComplete || false,
-        trickWinner,
-        trickPoints
-      };
+    const bidderId = this.state.currentBidder;
+    const bid = this.state.currentBid;
+    if (!bidderId || bid === null) {
+      return { success: false, message: 'No winning bid was found' };
     }
 
-    // Normal validation for non-test mode
-    // Check if it's the player's turn
+    this.partnerPlayerIds = partnerIds as string[];
+    const contract: Contract = {
+      bidderId,
+      bid,
+      partnerCalls: partnerCalls.map(card => ({ ...card })),
+      cutSuit,
+      revealedPartnerIds: []
+    };
+
+    this.state.contract = contract;
+    this.state.status = 'playing';
+    this.state.currentPlayer = bidderId;
+    this.state.roundNumber = 1;
+    return { success: true };
+  }
+
+  playCard(playerId: string, card: Card): PlayCardResult {
+    if (this.state.status !== 'playing') {
+      return { valid: false, message: 'The deal is not in the playing phase' };
+    }
     if (this.state.currentPlayer !== playerId) {
       return { valid: false, message: 'Not your turn' };
     }
 
-    // Check if the player has the card
     const playerHand = this.state.hands[playerId];
-    const cardIndex = playerHand.findIndex(c => c.suit === card.suit && c.value === card.value);
-    
+    if (!playerHand) {
+      return { valid: false, message: 'Player is not in this deal' };
+    }
+
+    const cardIndex = playerHand.findIndex(held => held.suit === card.suit && held.value === card.value);
     if (cardIndex === -1) {
       return { valid: false, message: 'Card not in hand' };
     }
 
-    // Check if the player is following suit
-    if (this.state.currentTrick.length > 0) {
-      const leadSuit = this.state.currentTrick[0].card.suit;
-      const hasSuit = playerHand.some(c => c.suit === leadSuit);
-      
-      if (hasSuit && card.suit !== leadSuit) {
+    if (this.state.currentRound.length > 0) {
+      const leadSuit = this.state.currentRound[0].card.suit;
+      const hasLeadSuit = playerHand.some(held => held.suit === leadSuit);
+      if (hasLeadSuit && card.suit !== leadSuit) {
         return { valid: false, message: 'Must follow suit' };
       }
     }
 
-    // Remove the card from the player's hand
     playerHand.splice(cardIndex, 1);
-    this.state.players.find(p => p.id === playerId)!.handSize--;
+    const player = this.state.players.find(candidate => candidate.id === playerId);
+    if (player) player.handSize = playerHand.length;
+    this.state.currentRound.push({ playerId, card });
 
-    // Add the card to the current trick
-    this.state.currentTrick.push({ playerId, card });
+    if (this.state.contract?.partnerCalls.some(call => call.suit === card.suit && call.value === card.value)) {
+      if (!this.state.contract.revealedPartnerIds.includes(playerId)) {
+        this.state.contract.revealedPartnerIds.push(playerId);
+      }
+    }
 
-    // Check if the trick is complete
-    const trickComplete = this.state.currentTrick.length === this.state.players.length;
+    const roundComplete = this.state.currentRound.length === this.state.players.length;
+    let roundWinner: string | undefined;
+    let roundPoints: number | undefined;
     let nextPlayer = this.getNextPlayer(playerId);
-    let trickWinner: string | undefined;
-    let trickPoints: number | undefined;
 
-    if (trickComplete) {
-      // Resolve the trick
-      const result = this.resolveTrick();
-      trickWinner = result.winner;
-      trickPoints = result.points;
-      nextPlayer = trickWinner;
-
-      // Check if the game is over
-      this.checkGameOver();
+    if (roundComplete) {
+      const result = this.resolveRound();
+      roundWinner = result.winner;
+      roundPoints = result.points;
+      nextPlayer = roundWinner;
+      this.checkDealOver();
     }
 
-    // Update the current player
     this.state.currentPlayer = nextPlayer;
-
-    return { 
-      valid: true, 
-      nextPlayer, 
-      trickComplete: trickComplete || false,
-      trickWinner,
-      trickPoints
+    return {
+      valid: true,
+      nextPlayer,
+      roundComplete,
+      roundWinner,
+      roundPoints,
+      gameOver: this.state.gameOver,
+      contractResult: this.state.contractResult
     };
   }
 
-  // Get the next player in turn
-  private getNextPlayer(currentPlayerId: string, playersArray?: Player[]): string {
-    // Use provided players array or the current state players
-    const players = playersArray || this.state.players;
-    
-    // Safety check: if no players, throw an error
-    if (!players || players.length === 0) {
-      throw new Error(`Cannot get next player: no players in the game`);
-    }
-    
-    // If only one player, that's the next player
-    if (players.length === 1) {
-      return players[0].id;
-    }
-    
-    // Find the current player's index
-    const currentIndex = players.findIndex(p => p.id === currentPlayerId);
-    
-    // If player not found, return the first player
-    if (currentIndex === -1) {
-      console.warn(`Player ${currentPlayerId} not found in player list. Returning first player.`);
-      return players[0].id;
-    }
-    
-    // Calculate next index with modulo to handle array bounds
-    const nextIndex = (currentIndex + 1) % players.length;
-    
-    // Final safety check
-    if (!players[nextIndex]) {
-      console.error(`Next player at index ${nextIndex} is undefined. Player list:`, players);
-      return players[0].id;
-    }
-    
-    return players[nextIndex].id;
-  }
-
-  // Resolve a completed trick
-  private resolveTrick(): { winner: string; points: number } {
-    const leadCard = this.state.currentTrick[0].card;
-    const leadSuit = leadCard.suit;
-    
-    // Find the highest card of the lead suit
-    let highestCard = leadCard;
-    let winnerIndex = 0;
-    
-    for (let i = 1; i < this.state.currentTrick.length; i++) {
-      const play = this.state.currentTrick[i];
-      const card = play.card;
-      
-      if (card.suit === leadSuit && this.compareCards(card, highestCard) > 0) {
-        highestCard = card;
-        winnerIndex = i;
-      }
-    }
-    
-    const winner = this.state.currentTrick[winnerIndex].playerId;
-    
-    // Calculate points for the trick
-    const points = this.calculateTrickPoints();
-    
-    // Update the winner's score
-    this.state.scores[winner] += points;
-    
-    // Store the trick
-    const trick: Trick = {
-      cards: [...this.state.currentTrick],
-      winner,
-      points
-    };
-    
-    this.state.tricks.push(trick);
-    this.state.lastTrick = { winner, points };
-    
-    // Clear the current trick
-    this.state.currentTrick = [];
-    this.state.trickNumber++;
-    
-    return { winner, points };
-  }
-
-  // Compare two cards (of the same suit)
-  private compareCards(card1: Card, card2: Card): number {
-    const valueOrder: Record<Card['value'], number> = {
-      '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
-      'J': 11, 'Q': 12, 'K': 13, 'A': 14
-    };
-    
-    return valueOrder[card1.value] - valueOrder[card2.value];
-  }
-
-  // Calculate points for a trick
-  private calculateTrickPoints(): number {
-    let points = 0;
-    
-    for (const play of this.state.currentTrick) {
-      const { suit, value } = play.card;
-      
-      if (value === '5') {
-        points += 5;
-      } else if (value === '10') {
-        points += 10;
-      } else if (value === 'A') {
-        points += 15;
-      } else if (value === 'Q' && suit === 'spades') {
-        points += 30;
-      }
-    }
-    
-    return points;
-  }
-
-  // Check if the game is over
-  private checkGameOver(): void {
-    // Check if any player has reached the target score
-    for (const playerId in this.state.scores) {
-      if (this.state.scores[playerId] >= this.state.targetScore) {
-        this.state.gameOver = true;
-        this.state.winner = playerId;
-        this.state.status = 'finished';
-        return;
-      }
-    }
-    
-    // Check if all cards have been played
-    const allCardsPlayed = Object.values(this.state.hands).every(hand => hand.length === 0);
-    
-    if (allCardsPlayed) {
-      this.state.gameOver = true;
-      
-      // Find the player with the highest score
-      let highestScore = -1;
-      let winner: string | null = null;
-      
-      for (const playerId in this.state.scores) {
-        if (this.state.scores[playerId] > highestScore) {
-          highestScore = this.state.scores[playerId];
-          winner = playerId;
-        }
-      }
-      
-      this.state.winner = winner;
-      this.state.status = 'finished';
-    }
-  }
-
-  // Restart the game with the same players
   restart(): void {
-    // Reset game state but keep players
     const players = this.state.players;
     const code = this.state.code;
-    const targetScore = this.state.targetScore;
-    
-    this.state = {
+    this.state = this.createInitialState(code, players);
+    this.start();
+  }
+
+  private createInitialState(code: string, players: Player[]): GameState {
+    const hands: Record<string, Card[]> = {};
+    const scores: Record<string, number> = {};
+    players.forEach(player => {
+      hands[player.id] = [];
+      scores[player.id] = 0;
+    });
+
+    return {
       code,
       players,
-      status: 'playing',
-      hands: {},
-      currentTrick: [],
-      tricks: [],
-      trickNumber: 0,
+      status: 'waiting',
+      hands,
+      currentRound: [],
+      rounds: [],
+      roundNumber: 0,
       currentPlayer: null,
-      scores: {},
-      targetScore,
+      scores,
       gameOver: false,
       winner: null,
-      lastTrick: null
+      winningTeamPlayerIds: [],
+      lastRound: null,
+      currentBid: null,
+      currentBidder: null,
+      passedPlayers: [],
+      bidHistory: [],
+      contract: null,
+      contractResult: null
     };
-    
-    // Initialize hands and scores
-    players.forEach(player => {
+  }
+
+  private resetDealState(): void {
+    this.state.hands = {};
+    this.state.scores = {};
+    this.state.players.forEach(player => {
       this.state.hands[player.id] = [];
       this.state.scores[player.id] = 0;
+      player.handSize = 0;
     });
-    
-    // Deal cards and start the game
-    this.dealCards();
-    this.state.currentPlayer = players[0].id;
-    this.state.trickNumber = 1;
+    this.state.currentRound = [];
+    this.state.rounds = [];
+    this.state.roundNumber = 0;
+    this.state.currentPlayer = null;
+    this.state.gameOver = false;
+    this.state.winner = null;
+    this.state.winningTeamPlayerIds = [];
+    this.state.lastRound = null;
+    this.state.currentBid = null;
+    this.state.currentBidder = null;
+    this.state.passedPlayers = [];
+    this.state.bidHistory = [];
+    this.state.contract = null;
+    this.state.contractResult = null;
+    this.partnerPlayerIds = [];
   }
-} 
+
+  private resetAuction(): void {
+    this.state.status = 'waiting';
+    this.state.currentPlayer = null;
+    this.state.currentBid = null;
+    this.state.currentBidder = null;
+    this.state.passedPlayers = [];
+    this.state.bidHistory = [];
+    this.state.contract = null;
+    this.partnerPlayerIds = [];
+  }
+
+  private advanceAuction(lastActorId: string): void {
+    const eligiblePlayers = this.state.players.filter(player =>
+      player.id !== this.state.currentBidder && !this.state.passedPlayers.includes(player.id)
+    );
+
+    if (eligiblePlayers.length === 0) {
+      this.state.status = 'contract';
+      this.state.currentPlayer = this.state.currentBidder;
+      return;
+    }
+
+    this.state.currentPlayer = this.getNextPlayer(lastActorId, this.state.players, player =>
+      player.id !== this.state.currentBidder && !this.state.passedPlayers.includes(player.id)
+    );
+  }
+
+  private getRequiredPartners(): number {
+    if (this.state.players.length <= 2) return 0;
+    return this.state.players.length <= 4 ? 1 : 2;
+  }
+
+  private dealCards(): void {
+    const deck = this.createDeck();
+    this.setAsideRemainderCards(deck);
+    this.shuffleDeck(deck);
+
+    const cardsPerPlayer = deck.length / this.state.players.length;
+    this.state.players.forEach((player, index) => {
+      const startIndex = index * cardsPerPlayer;
+      const endIndex = startIndex + cardsPerPlayer;
+      this.state.hands[player.id] = deck.slice(startIndex, endIndex);
+      player.handSize = this.state.hands[player.id].length;
+    });
+  }
+
+  private setAsideRemainderCards(deck: Card[]): void {
+    const remainder = deck.length % this.state.players.length;
+    for (let count = 0; count < remainder; count += 1) {
+      const candidates = deck
+        .map((card, index) => ({ card, index }))
+        .filter(({ card }) => card.suit !== 'spades' && this.cardPoints(card) === 0);
+      if (candidates.length === 0) {
+        throw new Error('Unable to set aside enough non-scoring cards for an even deal');
+      }
+
+      const lowestRank = Math.min(...candidates.map(({ card }) => CARD_RANK[card.value]));
+      const lowestCards = candidates.filter(({ card }) => CARD_RANK[card.value] === lowestRank);
+      const selected = lowestCards[Math.floor(Math.random() * lowestCards.length)];
+      deck.splice(selected.index, 1);
+    }
+  }
+
+  private createDeck(): Card[] {
+    return SUITS.flatMap(suit => VALUES.map(value => ({ suit, value })));
+  }
+
+  private shuffleDeck(deck: Card[]): void {
+    for (let index = deck.length - 1; index > 0; index--) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [deck[index], deck[swapIndex]] = [deck[swapIndex], deck[index]];
+    }
+  }
+
+  private resolveRound(): Round {
+    const leadSuit = this.state.currentRound[0].card.suit;
+    const cutSuit = this.state.contract!.cutSuit;
+    const cutCards = this.state.currentRound.filter(play => play.card.suit === cutSuit);
+    const winningSuit = cutCards.length > 0 ? cutSuit : leadSuit;
+    const winningPlays = this.state.currentRound.filter(play => play.card.suit === winningSuit);
+    const winningPlay = winningPlays.reduce((highest, play) =>
+      CARD_RANK[play.card.value] > CARD_RANK[highest.card.value] ? play : highest
+    );
+    const points = this.calculateRoundPoints();
+    const round: Round = {
+      cards: [...this.state.currentRound],
+      winner: winningPlay.playerId,
+      points
+    };
+
+    this.state.scores[round.winner] += points;
+    this.state.rounds.push(round);
+    this.state.lastRound = { winner: round.winner, points };
+    this.state.currentRound = [];
+    this.state.roundNumber += 1;
+    return round;
+  }
+
+  private calculateRoundPoints(): number {
+    return this.state.currentRound.reduce((points, play) => points + this.cardPoints(play.card), 0);
+  }
+
+  private cardPoints(card: Card): number {
+    if (card.value === '5') return 5;
+    if (card.value === '10') return 10;
+    if (card.value === 'A') return 15;
+    if (card.value === 'Q' && card.suit === 'spades') return 30;
+    return 0;
+  }
+
+  private checkDealOver(): void {
+    const allCardsPlayed = Object.values(this.state.hands).every(hand => hand.length === 0);
+    if (!allCardsPlayed || !this.state.contract) return;
+
+    const contractTeamIds = [this.state.contract.bidderId, ...this.partnerPlayerIds];
+    const defendingTeamIds = this.state.players
+      .map(player => player.id)
+      .filter(playerId => !contractTeamIds.includes(playerId));
+    const bidderTeamPoints = contractTeamIds.reduce((total, playerId) => total + (this.state.scores[playerId] || 0), 0);
+    const successful = bidderTeamPoints >= this.state.contract.bid;
+    const winningTeamPlayerIds = successful ? contractTeamIds : defendingTeamIds;
+    const winner = successful
+      ? this.state.contract.bidderId
+      : defendingTeamIds.reduce((highest, playerId) =>
+        (this.state.scores[playerId] || 0) > (this.state.scores[highest] || 0) ? playerId : highest
+      );
+
+    const contractResult: ContractResult = {
+      bidderId: this.state.contract.bidderId,
+      bid: this.state.contract.bid,
+      bidderTeamPoints,
+      successful,
+      signedPoints: successful ? this.state.contract.bid : -this.state.contract.bid,
+      winningTeamPlayerIds
+    };
+
+    this.state.gameOver = true;
+    this.state.status = 'finished';
+    this.state.winner = winner;
+    this.state.winningTeamPlayerIds = winningTeamPlayerIds;
+    this.state.contractResult = contractResult;
+  }
+
+  private getNextPlayer(
+    currentPlayerId: string,
+    players: Player[] = this.state.players,
+    isEligible: (player: Player) => boolean = () => true
+  ): string {
+    const currentIndex = players.findIndex(player => player.id === currentPlayerId);
+    for (let offset = 1; offset <= players.length; offset += 1) {
+      const candidate = players[(currentIndex + offset + players.length) % players.length];
+      if (candidate && isEligible(candidate)) return candidate.id;
+    }
+    return currentPlayerId;
+  }
+}

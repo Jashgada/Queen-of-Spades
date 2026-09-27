@@ -1,7 +1,7 @@
 import PropTypes from 'prop-types';
 import { motion } from 'framer-motion';
 
-export const Card = ({ suit, value, onClick, disabled, index, animate, isHovered, size, playable, unplayable }) => {
+export const Card = ({ suit, value, onClick, disabled, index, animate, isHovered, size, playable, unplayable, readOnly }) => {
   const getSuitSymbol = () => {
     switch (suit.toLowerCase()) {
       case 'spades': return '♠';
@@ -56,13 +56,13 @@ export const Card = ({ suit, value, onClick, disabled, index, animate, isHovered
     <motion.button
       type="button"
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || readOnly}
       aria-label={`${value} of ${suit}`}
       title={`${value} of ${suit}`}
       variants={cardVariants}
       initial={size === 'table' ? { opacity: 0, scale: 0.8 } : 'undealt'}
       animate={animate || "dealt"}
-      whileHover={disabled ? {} : { 
+      whileHover={disabled || readOnly ? {} : {
         scale: 1.05,
         y: -10,
         transition: { duration: 0.2 }
@@ -70,7 +70,7 @@ export const Card = ({ suit, value, onClick, disabled, index, animate, isHovered
       className={`
         ${sizeClass} relative flex shrink-0 select-none flex-col items-center justify-center
         rounded-xl border-2 shadow-lg transition-all duration-200
-        ${disabled ? (size === 'table' ? 'cursor-default bg-white' : 'cursor-not-allowed bg-gray-100') : 'cursor-pointer bg-white hover:-translate-y-1 hover:shadow-xl'}
+        ${readOnly ? 'cursor-default bg-white' : disabled ? (size === 'table' ? 'cursor-default bg-white' : 'cursor-not-allowed bg-gray-100') : 'cursor-pointer bg-white hover:-translate-y-1 hover:shadow-xl'}
         ${unplayable ? 'opacity-40 grayscale' : ''}
         ${playable ? 'border-gold-light shadow-[0_0_14px_rgba(222,178,92,0.35)]' : isHovered ? 'border-yellow-300 shadow-yellow-300/30' : 'border-gray-300'}
         focus-visible:z-10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/70
@@ -111,6 +111,7 @@ Card.propTypes = {
   size: PropTypes.oneOf(['default', 'hand', 'table']),
   playable: PropTypes.bool,
   unplayable: PropTypes.bool,
+  readOnly: PropTypes.bool,
 };
 
 Card.defaultProps = {
@@ -121,4 +122,5 @@ Card.defaultProps = {
   size: 'default',
   playable: false,
   unplayable: false,
+  readOnly: false,
 };

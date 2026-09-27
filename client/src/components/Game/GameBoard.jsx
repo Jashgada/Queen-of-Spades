@@ -5,11 +5,13 @@ import { Card } from './Card';
 import { ScoreBoard } from './ScoreBoard';
 import { GameToast } from './GameToast';
 import { GameOver } from './GameOver';
+import { CopyRoomCodeButton } from './CopyRoomCodeButton';
 
 export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isConnected }) => {
-  const { players, currentPlayer, playedCards, hand, trickNumber } = gameState;
+  const { players, currentPlayer, currentRound, hand, roundNumber } = gameState;
   const handlePlayCard = (card) => onPlayCard(card);
   const activePlayer = players.find(player => player.id === currentPlayer);
+  const contract = gameState.contract;
 
   return (
     <div className="min-h-screen bg-felt-dark bg-felt-texture px-3 py-4 text-white sm:px-6 sm:py-6">
@@ -25,17 +27,18 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {gameState.gameCode && (
-            <div className="rounded-xl border border-white/10 px-3 py-2 text-xs text-white/65">
-              Room <span className="ml-1 font-mono font-bold tracking-wider text-white">{gameState.gameCode}</span>
+            <div className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2 text-xs text-white/65">
+              <span>Room <span className="ml-1 font-mono font-bold tracking-wider text-white">{gameState.gameCode}</span></span>
+              <CopyRoomCodeButton code={gameState.gameCode} />
             </div>
           )}
           <div className="rounded-xl bg-white/5 px-3 py-2 text-sm">
-            <span className="font-semibold text-gold-light">Trick {trickNumber}</span>
+            <span className="font-semibold text-gold-light">Round {roundNumber}</span>
             <span className="mx-2 text-white/30">·</span>
-            <span className="text-white/70">{playedCards.length}/{players.length} played</span>
+            <span className="text-white/70">{currentRound.length}/{players.length} played</span>
           </div>
           <div className="rounded-xl bg-white/5 px-3 py-2 text-sm text-white/70">
-            Target <span className="font-bold text-gold-light">{gameState.targetScore || 75}</span>
+            Bid <span className="font-bold text-gold-light">{contract?.bid}</span>
           </div>
           <div className={`rounded-xl border px-3 py-2 text-xs font-semibold ${isConnected ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200' : 'border-red-300/30 bg-red-900/30 text-red-100'}`} role="status">
             <span aria-hidden="true" className="mr-1.5">●</span>{isConnected ? 'Connected' : 'Reconnecting'}
@@ -52,6 +55,8 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
             {players.map(player => {
               const isTurn = player.id === currentPlayer;
               const isYou = player.id === gameState.currentPlayerId;
+              const isRevealedPartner = contract?.revealedPartnerIds.includes(player.id);
+              const isBidder = contract?.bidderId === player.id;
               return (
                 <motion.div
                   key={player.id}
@@ -68,7 +73,9 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
                       <p className={`truncate text-sm font-semibold ${isTurn ? 'text-gold-light' : 'text-white'}`}>
                         {player.name}{isYou ? ' (You)' : ''}
                       </p>
-                      <p className="text-xs text-white/60">{player.handSize || 0} cards</p>
+                      <p className="text-xs text-white/60">
+                        {player.handSize || 0} cards{isBidder ? ' · Bidder' : isRevealedPartner ? ' · Partner' : ''}
+                      </p>
                     </div>
                   </div>
                   {isTurn && <span className="mt-1 block text-[10px] font-semibold uppercase tracking-wider text-gold-light">Turn</span>}
@@ -78,15 +85,15 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
           </div>
 
           {/* Center area with current played card */}
-          <section className="flex min-h-52 flex-col justify-center rounded-2xl border border-white/10 bg-felt-dark/30 px-3 py-5 sm:min-h-64 sm:px-5" aria-label="Cards played this trick">
+          <section className="flex min-h-52 flex-col justify-center rounded-2xl border border-white/10 bg-felt-dark/30 px-3 py-5 sm:min-h-64 sm:px-5" aria-label="Cards played this round">
             <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-white/80">Current trick</h2>
-              <span className="text-xs text-white/50">{playedCards.length} of {players.length} cards</span>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-white/80">Current round</h2>
+              <span className="text-xs text-white/50">{currentRound.length} of {players.length} cards</span>
             </div>
             <AnimatePresence mode="popLayout">
-              {playedCards.length > 0 ? (
+              {currentRound.length > 0 ? (
                 <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5">
-                  {playedCards.map((play, index) => (
+                  {currentRound.map((play, index) => (
                     <motion.div
                       key={`${play.playerId}-${play.card.suit}-${play.card.value}`}
                       initial={{ scale: 0.75, opacity: 0, y: 16 }}
@@ -104,7 +111,7 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
                 </div>
               ) : (
                 <motion.p key="no-cards" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-8 text-center text-sm text-white/50 sm:text-base">
-                  {activePlayer ? `${activePlayer.name} leads the trick` : 'Waiting for the first card'}
+                  {activePlayer ? `${activePlayer.name} leads the round` : 'Waiting for the first card'}
                 </motion.p>
               )}
             </AnimatePresence>
@@ -122,7 +129,7 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
               cards={hand}
               onPlayCard={handlePlayCard}
               isActive={gameState.currentPlayer === gameState.currentPlayerId}
-              leadSuit={playedCards[0]?.card.suit}
+              leadSuit={currentRound[0]?.card.suit}
             />
           </section>
         </main>
@@ -133,11 +140,16 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
             scores={gameState.scores}
             currentPlayerId={gameState.currentPlayerId}
             activePlayerId={currentPlayer}
-            targetScore={gameState.targetScore || 75}
+            bid={contract?.bid || gameState.currentBid || 75}
           />
           <p className="rounded-2xl border border-gold/30 bg-felt-dark/60 p-4 text-sm leading-relaxed text-white/70">
-            <span className="mb-1 block font-semibold text-gold-light">Table rules</span>
-            2–6 players supported · 4–6 recommended
+            <span className="mb-1 block font-semibold text-gold-light">Contract</span>
+            <span className="block">{players.find(player => player.id === contract?.bidderId)?.name || 'Bidder'} · {contract?.bid} bid · {contract?.cutSuit} is trump</span>
+            {contract?.partnerCalls.length > 0 && (
+              <span className="mt-2 block text-xs text-white/55">
+                Called cards: {contract.partnerCalls.map(card => `${card.value} of ${card.suit}`).join(', ')}
+              </span>
+            )}
           </p>
         </aside>
       </div>
@@ -152,10 +164,10 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
             duration={3000}
           />
         )}
-        {gameState.lastTrick && (
+        {gameState.lastRound && (
           <GameToast
-            key={`trick-${gameState.trickNumber}-${gameState.lastTrick.winner}`}
-            message={`${players.find(p => p.id === gameState.lastTrick.winner)?.name || 'Player'} won the trick (+${gameState.lastTrick.points} points)`}
+            key={`round-${gameState.roundNumber}-${gameState.lastRound.winner}`}
+            message={`${players.find(p => p.id === gameState.lastRound.winner)?.name || 'Player'} won the round (+${gameState.lastRound.points} points)`}
             onClose={() => {}}
             duration={2000}
           />
@@ -167,11 +179,12 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
         {gameState.gameOver && (
           <GameOver
             winner={gameState.winner}
+            winningTeamPlayerIds={gameState.winningTeamPlayerIds}
+            contractResult={gameState.contractResult}
             scores={gameState.scores}
             players={players}
             currentPlayerId={gameState.currentPlayerId}
             onRematch={onRematch}
-            targetScore={gameState.targetScore}
           />
         )}
       </AnimatePresence>
@@ -191,7 +204,7 @@ GameBoard.propTypes = {
     ).isRequired,
     currentPlayer: PropTypes.string,
     currentPlayerId: PropTypes.string,
-    playedCards: PropTypes.arrayOf(
+    currentRound: PropTypes.arrayOf(
       PropTypes.shape({
         playerId: PropTypes.string.isRequired,
         card: PropTypes.shape({
@@ -207,15 +220,19 @@ GameBoard.propTypes = {
       })
     ).isRequired,
     scores: PropTypes.object.isRequired,
+    rounds: PropTypes.array,
+    roundNumber: PropTypes.number,
     gameCode: PropTypes.string,
     gameOver: PropTypes.bool,
     winner: PropTypes.string,
-    lastTrick: PropTypes.shape({
+    winningTeamPlayerIds: PropTypes.arrayOf(PropTypes.string),
+    contractResult: PropTypes.object,
+    contract: PropTypes.object,
+    currentBid: PropTypes.number,
+    lastRound: PropTypes.shape({
       winner: PropTypes.string,
       points: PropTypes.number
     }),
-    targetScore: PropTypes.number,
-    trickNumber: PropTypes.number
   }).isRequired,
   onPlayCard: PropTypes.func.isRequired,
   onRematch: PropTypes.func.isRequired,

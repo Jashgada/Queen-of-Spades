@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { GameBoard } from './GameBoard';
+import { BiddingPhase } from './BiddingPhase';
+import { CopyRoomCodeButton } from './CopyRoomCodeButton';
 import { useGame } from '../../hooks/useGame';
 import { useSocket } from '../../hooks/useSocket';
 
 export const Game = () => {
-  const { gameState, errorMessage, createGame, joinGame, startGame, playCard, rematch, isCurrentPlayer } = useGame();
+  const { gameState, errorMessage, createGame, joinGame, startGame, placeBid, passBid, setContract, playCard, rematch, isCurrentPlayer } = useGame();
   const { connected } = useSocket();
   const [playerName, setPlayerName] = useState('');
   const [gameCode, setGameCode] = useState('');
@@ -168,6 +170,20 @@ export const Game = () => {
       alert(error.message || 'Failed to request rematch');
     }
   };
+
+  if (gameState.gameStatus === 'bidding' || gameState.gameStatus === 'contract') {
+    return (
+      <BiddingPhase
+        gameState={gameState}
+        currentPlayerId={gameState.currentPlayerId}
+        isConnected={connected}
+        onBid={placeBid}
+        onPass={passBid}
+        onSetContract={setContract}
+        errorMessage={errorMessage}
+      />
+    );
+  }
 
   // Render home view
   if (view === 'home') {
@@ -388,8 +404,11 @@ export const Game = () => {
           {/* Room Code */}
           <div className="mb-6 text-center">
             <div className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/55">Share this room code</div>
-            <div className="inline-block rounded-xl border border-gold/30 bg-black/20 px-5 py-2 font-mono text-2xl font-bold tracking-[0.25em] text-gold-light">
-              {gameState.gameCode}
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <div className="rounded-xl border border-gold/30 bg-black/20 px-5 py-2 font-mono text-2xl font-bold tracking-[0.25em] text-gold-light">
+                {gameState.gameCode}
+              </div>
+              <CopyRoomCodeButton code={gameState.gameCode} />
             </div>
           </div>
           
