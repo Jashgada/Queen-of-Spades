@@ -264,7 +264,7 @@ export const useGame = () => {
             ...INITIAL_STATE,
             gameCode: response.gameCode,
             currentPlayerId: player.id,
-            hostId: response.hostId || previous.hostId,
+            hostId: response.hostId || response.players?.[0]?.id || previous.hostId,
             players: response.players || [player]
           }));
           resolve(response);
