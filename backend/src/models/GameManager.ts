@@ -44,6 +44,10 @@ export class GameManager {
       return { success: false, message: 'Game already started' };
     }
 
+    if (foundGame.getState().players.length >= 6) {
+      return { success: false, message: 'Game is full (maximum 6 players)' };
+    }
+
     const player = foundGame.addPlayer(playerName, socketId);
     // Get the actual game code from the game
     const actualGameCode = foundGame.getState().code;
@@ -269,4 +273,4 @@ export class GameManager {
     // We expect gameCode to already be uppercase at this point
     return this.games.get(gameCode);
   }
-} 
+}

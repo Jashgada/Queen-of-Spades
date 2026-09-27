@@ -1,6 +1,6 @@
 # Queen-of-Spades
 A online multiplayer card game.
-This game is called queen of spades and will be a web app card game. Players will be able to create/join a table/game using a 6 character long alphanumeric code. The minimum number of players required are 4 and maximum is 6 in each room.
+This game is called Queen of Spades and is a web-based multiplayer card game. Players can create or join a table using a 6-character alphanumeric code. Tables support 2–6 players, with 4–6 recommended.
 
 ### Installation Steps for Local Development
 

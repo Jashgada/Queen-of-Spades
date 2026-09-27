@@ -1,8 +1,7 @@
-import React from 'react';
 import PropTypes from 'prop-types';
 import { motion } from 'framer-motion';
 
-export const Card = ({ suit, value, onClick, disabled, index, animate, isHovered }) => {
+export const Card = ({ suit, value, onClick, disabled, index, animate, isHovered, size, playable, unplayable }) => {
   const getSuitSymbol = () => {
     switch (suit.toLowerCase()) {
       case 'spades': return '♠';
@@ -15,6 +14,11 @@ export const Card = ({ suit, value, onClick, disabled, index, animate, isHovered
 
   const isRed = suit.toLowerCase() === 'hearts' || suit.toLowerCase() === 'diamonds';
   const textColorClass = isRed ? 'text-[#FF0000]' : 'text-black';
+  const sizeClass = size === 'hand'
+    ? 'h-24 w-[4.25rem] sm:h-28 sm:w-20 lg:h-36 lg:w-24'
+    : size === 'table'
+      ? 'h-20 w-14 sm:h-24 sm:w-16'
+      : 'h-36 w-24';
 
   // Animation variants
   const cardVariants = {
@@ -27,7 +31,7 @@ export const Card = ({ suit, value, onClick, disabled, index, animate, isHovered
       transition: { 
         type: "spring",
         duration: 0.5,
-        delay: index * 0.1
+        delay: Math.min(index * 0.025, 0.3)
       }
     },
     undealt: {
@@ -50,10 +54,13 @@ export const Card = ({ suit, value, onClick, disabled, index, animate, isHovered
 
   return (
     <motion.button
+      type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-label={`${value} of ${suit}`}
+      title={`${value} of ${suit}`}
       variants={cardVariants}
-      initial="undealt"
+      initial={size === 'table' ? { opacity: 0, scale: 0.8 } : 'undealt'}
       animate={animate || "dealt"}
       whileHover={disabled ? {} : { 
         scale: 1.05,
@@ -61,24 +68,23 @@ export const Card = ({ suit, value, onClick, disabled, index, animate, isHovered
         transition: { duration: 0.2 }
       }}
       className={`
-        w-24 h-36 m-2 rounded-lg shadow-lg
-        ${disabled ? 'bg-gray-200' : 'bg-white'}
-        border-2 ${isHovered ? 'border-yellow-300' : 'border-gray-300'}
-        flex flex-col items-center justify-center
-        ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}
-        relative
-        transition-all duration-200
-        ${isHovered ? 'shadow-xl shadow-yellow-300/30' : ''}
+        ${sizeClass} relative flex shrink-0 select-none flex-col items-center justify-center
+        rounded-xl border-2 shadow-lg transition-all duration-200
+        ${disabled ? (size === 'table' ? 'cursor-default bg-white' : 'cursor-not-allowed bg-gray-100') : 'cursor-pointer bg-white hover:-translate-y-1 hover:shadow-xl'}
+        ${unplayable ? 'opacity-40 grayscale' : ''}
+        ${playable ? 'border-gold-light shadow-[0_0_14px_rgba(222,178,92,0.35)]' : isHovered ? 'border-yellow-300 shadow-yellow-300/30' : 'border-gray-300'}
+        focus-visible:z-10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-yellow-300/70
       `}
       style={{ color: isRed ? '#FF0000' : 'black' }}
     >
       {/* Top-left corner */}
-      <div className="absolute top-2 left-2 text-sm">
-        <div className={`font-bold ${textColorClass}`}>{value}</div>
+      <div className={`absolute left-1.5 top-1.5 flex flex-col items-center text-xs leading-none sm:left-2 sm:top-2 sm:text-sm ${textColorClass}`}>
+        <span className="font-bold">{value}</span>
+        <span aria-hidden="true">{getSuitSymbol()}</span>
       </div>
 
       {/* Center symbol */}
-      <div className={`text-6xl ${textColorClass} opacity-30`}>
+      <div aria-hidden="true" className={`${size === 'table' ? 'text-4xl sm:text-5xl' : 'text-5xl sm:text-6xl'} ${textColorClass} opacity-30`}>
         {getSuitSymbol()}
       </div>
 
@@ -101,12 +107,18 @@ Card.propTypes = {
   disabled: PropTypes.bool,
   index: PropTypes.number,
   animate: PropTypes.string,
-  isHovered: PropTypes.bool
+  isHovered: PropTypes.bool,
+  size: PropTypes.oneOf(['default', 'hand', 'table']),
+  playable: PropTypes.bool,
+  unplayable: PropTypes.bool,
 };
 
 Card.defaultProps = {
   onClick: () => {},
   disabled: false,
   index: 0,
-  isHovered: false
-}; 
+  isHovered: false,
+  size: 'default',
+  playable: false,
+  unplayable: false,
+};

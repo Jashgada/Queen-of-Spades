@@ -1,27 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { GameBoard } from './GameBoard';
 import { useGame } from '../../hooks/useGame';
 import { useSocket } from '../../hooks/useSocket';
-import { motion, AnimatePresence } from 'framer-motion';
-
-// Updated StatBox component
-const StatBox = ({ label, value }) => (
-  <div className="mb-2">
-    <div className="text-black/70 text-sm">{label}</div>
-    <div className="text-black font-semibold">{value}</div>
-  </div>
-);
-
-// Updated WinnerItem component
-const WinnerItem = ({ name, amount, avatar }) => (
-  <tr className="border-b border-black/10 last:border-0">
-    <td className="py-2 pr-2">
-      <img src={avatar} alt={name} className="w-6 h-6 rounded-full" />
-    </td>
-    <td className="py-2 text-black">{name}</td>
-    <td className="py-2 text-right text-black font-semibold">${amount}</td>
-  </tr>
-);
 
 export const Game = () => {
   const { gameState, errorMessage, createGame, joinGame, startGame, playCard, rematch, isCurrentPlayer } = useGame();
@@ -30,8 +10,8 @@ export const Game = () => {
   const [gameCode, setGameCode] = useState('');
   const [view, setView] = useState('home'); // home, create, join, lobby, playing
   const [isLoading, setIsLoading] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
   const loadingTimeoutRef = useRef(null);
+  const gameStatus = gameState.gameStatus;
 
   // When gameState.gameCode is set, transition to the lobby
   useEffect(() => {
@@ -68,29 +48,14 @@ export const Game = () => {
     };
   }, []);
 
-  // Enable debug mode with keyboard shortcut (Ctrl+Shift+D)
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
-        setShowDebug(prev => !prev);
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   // When gameState changes, update the view accordingly
   useEffect(() => {
-    console.log('[Game] Game state updated:', gameState);
-    if (gameState.gameStatus === 'playing') {
-      console.log('[Game] Transitioning to playing view');
+    if (gameStatus === 'playing') {
       setView('playing');
-    } else if (gameState.gameStatus === 'finished') {
-      console.log('[Game] Transitioning to game over view');
+    } else if (gameStatus === 'finished') {
       setView('gameOver');
     }
-  }, [gameState.gameStatus]);
+  }, [gameStatus]);
 
   // Create a new game
   const handleCreateGame = async (e) => {
@@ -204,96 +169,51 @@ export const Game = () => {
     }
   };
 
-  // Cancel loading state
-  const handleCancelLoading = () => {
-    setIsLoading(false);
-    if (loadingTimeoutRef.current) {
-      clearTimeout(loadingTimeoutRef.current);
-      loadingTimeoutRef.current = null;
-    }
-  };
-
-  // DEBUG FUNCTION
-  const showState = () => {
-    console.log('[Game] Current state:', {
-      view,
-      isLoading,
-      playerName,
-      gameCode,
-      gameState,
-      errorMessage,
-      connected
-    });
-    alert('Debug info logged to console');
-  };
-
   // Render home view
   if (view === 'home') {
     return (
-      <div className="min-h-screen bg-felt bg-felt-texture p-6 flex flex-col items-center">
+      <div className="flex min-h-screen flex-col items-center bg-felt bg-felt-texture p-4 sm:p-8">
         {/* Header */}
-        <div className="text-center mb-6">
-          <div className="flex items-center justify-center mb-1">
-            <img src="/assets/images/crown.svg" alt="Crown" className="w-6 h-6 mr-2" />
-            <h1 className="text-black text-2xl font-bold">Queen of Spades</h1>
+        <div className="mb-7 mt-6 text-center sm:mb-10 sm:mt-10">
+          <div className="mb-2 flex items-center justify-center">
+            <img src="/assets/images/crown.svg" alt="" className="mr-2 h-8 w-8" />
+            <h1 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">Queen of Spades</h1>
           </div>
-          <div className="text-black/70 text-sm">Multiplayer Card Game</div>
+          <p className="text-sm text-white/70 sm:text-base">A classic card table, wherever your friends are.</p>
         </div>
 
         {/* Main Container */}
-        <div className="w-full max-w-md bg-white rounded-md p-4 shadow-md">
-          {/* Action Buttons */}
-          <div className="mb-4">
+        <div className="w-full max-w-lg rounded-3xl border border-gold/40 bg-felt-dark/85 p-5 shadow-table backdrop-blur-sm sm:p-8">
+          <p className="mb-6 text-center text-sm leading-relaxed text-white/70">
+            Create a table for your group or join one with a room code.
+          </p>
+          <div className="space-y-3">
             <button 
               onClick={() => setView('create')}
-              className="w-full bg-gray-200 hover:bg-gray-300 text-black py-1 px-2 rounded mb-2 flex items-center justify-center"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-gold px-4 py-3 font-bold text-felt-dark shadow-lg transition-colors hover:bg-gold-light"
             >
-              <img src="/assets/images/plus.svg" alt="Create" className="w-4 h-4 mr-2" />
+              <img src="/assets/images/plus.svg" alt="" className="h-4 w-4" />
               Create New Room
             </button>
             <button 
               onClick={() => setView('join')}
-              className="w-full bg-gray-200 hover:bg-gray-300 text-black py-1 px-2 rounded flex items-center justify-center"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/5 px-4 py-3 font-semibold text-white transition-colors hover:bg-white/10"
             >
-              <img src="/assets/images/gamepad.svg" alt="Join" className="w-4 h-4 mr-2" />
+              <img src="/assets/images/gamepad.svg" alt="" className="h-4 w-4" />
               Join Room
             </button>
           </div>
 
-          {/* Stats */}
-          <div className="mb-4">
-            <StatBox label="Active Players" value="1,234" />
-            <StatBox label="Active Rooms" value="89" />
-          </div>
-
-          {/* Recent Winners */}
-          <div>
-            <h2 className="text-black text-lg font-bold mb-2">Recent Winners</h2>
-            <table className="w-full">
-              <tbody>
-                <WinnerItem 
-                  name="Alex M."
-                  amount="1,200"
-                  avatar="https://api.dicebear.com/7.x/avataaars/svg?seed=Alex"
-                />
-                <WinnerItem 
-                  name="Sarah K."
-                  amount="950"
-                  avatar="https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah"
-                />
-                <WinnerItem 
-                  name="Mike R."
-                  amount="780"
-                  avatar="https://api.dicebear.com/7.x/avataaars/svg?seed=Mike"
-                />
-              </tbody>
-            </table>
+          <div className="mt-6 flex items-center justify-center gap-2 border-t border-white/10 pt-5 text-center text-xs text-white/60 sm:text-sm">
+            <span className="font-semibold text-gold-light">2–6 players</span>
+            <span aria-hidden="true">·</span>
+            <span>4–6 recommended</span>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="mt-auto pt-6 text-black/40 text-sm">
-          © 2025 Queen of Spades
+        <div className="mt-auto pt-10 text-xs text-white/40">
+          © {new Date().getFullYear()} Queen of Spades
         </div>
       </div>
     );
@@ -302,21 +222,21 @@ export const Game = () => {
   // Create game view
   if (view === 'create') {
     return (
-      <div className="min-h-screen bg-felt bg-felt-texture p-6 flex flex-col items-center">
+      <div className="flex min-h-screen flex-col items-center bg-felt bg-felt-texture p-4 sm:justify-center sm:p-8">
         {/* Header */}
-        <div className="text-center mb-6">
-          <div className="flex items-center justify-center mb-1">
-            <img src="/assets/images/crown.svg" alt="Crown" className="w-6 h-6 mr-2" />
-            <h1 className="text-black text-2xl font-bold">Queen of Spades</h1>
+        <div className="mb-6 text-center">
+          <div className="mb-1 flex items-center justify-center">
+            <img src="/assets/images/crown.svg" alt="" className="mr-2 h-7 w-7" />
+            <h1 className="text-2xl font-bold text-white">Queen of Spades</h1>
           </div>
-          <div className="text-black/70 text-sm">Create New Room</div>
+          <p className="text-sm text-white/60">Create a table for your friends</p>
         </div>
 
         {/* Form Container */}
-        <div className="w-full max-w-md bg-white rounded-md p-4 shadow-md">
+        <div className="w-full max-w-md rounded-2xl border border-gold/30 bg-felt-dark/85 p-5 shadow-table sm:p-7">
           <form onSubmit={handleCreateGame} className="space-y-4">
             <div>
-              <label htmlFor="playerName" className="block text-black text-sm font-medium mb-1">
+              <label htmlFor="playerName" className="mb-1 block text-sm font-medium text-white/80">
                 Your Name
               </label>
               <input
@@ -324,7 +244,8 @@ export const Game = () => {
                 id="playerName"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                className="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded text-black"
+                maxLength={24}
+                className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2.5 text-white placeholder:text-white/35"
                 placeholder="Enter your name"
                 required
                 autoFocus
@@ -335,14 +256,14 @@ export const Game = () => {
               <button
                 type="button"
                 onClick={() => setView('home')}
-                className="flex-1 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black rounded"
+                className="flex-1 rounded-lg border border-white/15 px-3 py-2.5 font-medium text-white/80 transition-colors hover:bg-white/10"
               >
                 Back
               </button>
               <button
                 type="submit"
                 disabled={isLoading || !connected}
-                className="flex-1 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 rounded-lg bg-gold px-3 py-2.5 font-bold text-felt-dark transition-colors hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isLoading ? 'Creating...' : 'Create Room'}
               </button>
@@ -350,13 +271,13 @@ export const Game = () => {
           </form>
           
           {!connected && (
-            <div className="mt-4 text-yellow-600 text-center">
+            <div className="mt-4 text-center text-sm text-gold-light" role="status">
               Connecting to server...
             </div>
           )}
           
           {errorMessage && (
-            <div className="mt-4 text-red-600 bg-red-100 p-2 rounded text-center">
+            <div className="mt-4 rounded-lg border border-red-300/30 bg-red-900/40 p-3 text-center text-sm text-red-100" role="alert">
               {errorMessage}
             </div>
           )}
@@ -368,21 +289,21 @@ export const Game = () => {
   // Join game view
   if (view === 'join') {
     return (
-      <div className="min-h-screen bg-felt bg-felt-texture p-6 flex flex-col items-center">
+      <div className="flex min-h-screen flex-col items-center bg-felt bg-felt-texture p-4 sm:justify-center sm:p-8">
         {/* Header */}
-        <div className="text-center mb-6">
-          <div className="flex items-center justify-center mb-1">
-            <img src="/assets/images/crown.svg" alt="Crown" className="w-6 h-6 mr-2" />
-            <h1 className="text-black text-2xl font-bold">Queen of Spades</h1>
+        <div className="mb-6 text-center">
+          <div className="mb-1 flex items-center justify-center">
+            <img src="/assets/images/crown.svg" alt="" className="mr-2 h-7 w-7" />
+            <h1 className="text-2xl font-bold text-white">Queen of Spades</h1>
           </div>
-          <div className="text-black/70 text-sm">Join Room</div>
+          <p className="text-sm text-white/60">Join your friends at the table</p>
         </div>
 
         {/* Form Container */}
-        <div className="w-full max-w-md bg-white rounded-md p-4 shadow-md">
+        <div className="w-full max-w-md rounded-2xl border border-gold/30 bg-felt-dark/85 p-5 shadow-table sm:p-7">
           <form onSubmit={handleJoinGame} className="space-y-4">
             <div>
-              <label htmlFor="playerName" className="block text-black text-sm font-medium mb-1">
+              <label htmlFor="playerName" className="mb-1 block text-sm font-medium text-white/80">
                 Your Name
               </label>
               <input
@@ -390,22 +311,25 @@ export const Game = () => {
                 id="playerName"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                className="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded text-black"
+                maxLength={24}
+                className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2.5 text-white placeholder:text-white/35"
                 placeholder="Enter your name"
                 required
               />
             </div>
             
             <div>
-              <label htmlFor="gameCode" className="block text-black text-sm font-medium mb-1">
+              <label htmlFor="gameCode" className="mb-1 block text-sm font-medium text-white/80">
                 Room Code
               </label>
               <input
                 type="text"
                 id="gameCode"
                 value={gameCode}
-                onChange={(e) => setGameCode(e.target.value)}
-                className="w-full px-2 py-1 bg-gray-100 border border-gray-300 rounded text-black"
+                onChange={(e) => setGameCode(e.target.value.toUpperCase().slice(0, 6))}
+                maxLength={6}
+                autoCapitalize="characters"
+                className="w-full rounded-lg border border-white/15 bg-black/20 px-3 py-2.5 font-mono uppercase tracking-[0.2em] text-white placeholder:font-sans placeholder:tracking-normal placeholder:text-white/35"
                 placeholder="Enter room code"
                 required
                 autoFocus
@@ -416,14 +340,14 @@ export const Game = () => {
               <button
                 type="button"
                 onClick={() => setView('home')}
-                className="flex-1 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black rounded"
+                className="flex-1 rounded-lg border border-white/15 px-3 py-2.5 font-medium text-white/80 transition-colors hover:bg-white/10"
               >
                 Back
               </button>
               <button
                 type="submit"
                 disabled={isLoading || !connected}
-                className="flex-1 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 rounded-lg bg-gold px-3 py-2.5 font-bold text-felt-dark transition-colors hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isLoading ? 'Joining...' : 'Join Room'}
               </button>
@@ -431,13 +355,13 @@ export const Game = () => {
           </form>
           
           {!connected && (
-            <div className="mt-4 text-yellow-600 text-center">
+            <div className="mt-4 text-center text-sm text-gold-light" role="status">
               Connecting to server...
             </div>
           )}
           
           {errorMessage && (
-            <div className="mt-4 text-red-600 bg-red-100 p-2 rounded text-center">
+            <div className="mt-4 rounded-lg border border-red-300/30 bg-red-900/40 p-3 text-center text-sm text-red-100" role="alert">
               {errorMessage}
             </div>
           )}
@@ -449,46 +373,49 @@ export const Game = () => {
   // Lobby view
   if (view === 'lobby') {
     return (
-      <div className="min-h-screen bg-felt bg-felt-texture p-6 flex flex-col items-center">
+      <div className="flex min-h-screen flex-col items-center bg-felt bg-felt-texture p-4 sm:justify-center sm:p-8">
         {/* Header */}
-        <div className="text-center mb-6">
-          <div className="flex items-center justify-center mb-1">
-            <img src="/assets/images/crown.svg" alt="Crown" className="w-6 h-6 mr-2" />
-            <h1 className="text-black text-2xl font-bold">Queen of Spades</h1>
+        <div className="mb-6 text-center">
+          <div className="mb-1 flex items-center justify-center">
+            <img src="/assets/images/crown.svg" alt="" className="mr-2 h-7 w-7" />
+            <h1 className="text-2xl font-bold text-white">Queen of Spades</h1>
           </div>
-          <div className="text-black/70 text-sm">Game Lobby</div>
+          <p className="text-sm text-white/60">Waiting for your table to fill</p>
         </div>
 
         {/* Lobby Container */}
-        <div className="w-full max-w-md bg-white rounded-md p-4 shadow-md">
+        <div className="w-full max-w-lg rounded-2xl border border-gold/30 bg-felt-dark/85 p-5 shadow-table sm:p-7">
           {/* Room Code */}
-          <div className="mb-4 text-center">
-            <div className="text-black/70 text-sm mb-1">Room Code</div>
-            <div className="text-black text-xl font-bold tracking-wider bg-gray-100 py-1 px-4 rounded inline-block">
+          <div className="mb-6 text-center">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/55">Share this room code</div>
+            <div className="inline-block rounded-xl border border-gold/30 bg-black/20 px-5 py-2 font-mono text-2xl font-bold tracking-[0.25em] text-gold-light">
               {gameState.gameCode}
             </div>
           </div>
           
           {/* Players */}
-          <div className="mb-4">
-            <h2 className="text-black text-lg font-bold mb-2">Players</h2>
-            <div className="bg-gray-100 rounded p-2">
+          <div className="mb-5">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white">Players</h2>
+              <span className="text-sm font-medium text-white/60">{gameState.players.length}/6</span>
+            </div>
+            <div className="space-y-2 rounded-xl border border-white/10 bg-black/15 p-3">
               {gameState.players.map((player, index) => (
                 <div 
                   key={player.id} 
-                  className="flex items-center py-1 border-b border-gray-200 last:border-0"
+                  className="flex items-center rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2.5"
                 >
-                  <div className="w-6 h-6 rounded-full bg-gray-300 text-gray-700 flex items-center justify-center font-bold text-sm">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-felt-light/40 text-sm font-bold text-gold-light">
                     {index + 1}
                   </div>
-                  <div className="ml-2 text-black">
+                  <div className="ml-3 min-w-0 truncate font-medium text-white">
                     {player.name}
                     {player.id === gameState.currentPlayerId && ' (You)'}
                   </div>
                   {player.id === gameState.hostId && (
-                    <div className="ml-auto text-black/70 text-sm flex items-center">
-                      <span className="mr-1">Host</span>
-                      <span className="text-xs">👑</span>
+                    <div className="ml-auto flex items-center gap-1 text-xs font-semibold text-gold-light">
+                      <span>Host</span>
+                      <span aria-hidden="true">♛</span>
                     </div>
                   )}
                 </div>
@@ -497,26 +424,24 @@ export const Game = () => {
           </div>
           
           {/* Actions */}
-          <div className="flex gap-2">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <button
               onClick={() => setView('home')}
-              className="flex-1 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black rounded"
+              className="flex-1 rounded-lg border border-white/15 px-3 py-2.5 font-medium text-white/80 transition-colors hover:bg-white/10"
             >
               Leave
             </button>
             {gameState.hostId === gameState.currentPlayerId && (
               <button
                 onClick={handleStartGame}
-                disabled={gameState.players?.length < 2}
-                className="flex-1 px-2 py-1 bg-gray-200 hover:bg-gray-300 text-black rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={gameState.players?.length < 2 || gameState.players?.length > 6}
+                className="flex-1 rounded-lg bg-gold px-3 py-2.5 font-bold text-felt-dark transition-colors hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {console.log('Players:', gameState.players)}
-                {console.log('Can start:', gameState.players?.length >= 2)}
-                Start Game ({gameState.players?.length || 0} players)
+                Start Game · {gameState.players?.length || 0} players
               </button>
             )}
             {gameState.hostId !== gameState.currentPlayerId && (
-              <div className="flex-1 px-2 py-1 bg-gray-100 text-black/60 rounded text-center">
+              <div className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-center text-white/60">
                 Waiting for host...
               </div>
             )}
@@ -524,69 +449,32 @@ export const Game = () => {
           
           {/* Error message */}
           {errorMessage && (
-            <div className="mt-4 text-red-600 bg-red-100 p-2 rounded text-center">
+            <div className="mt-4 rounded-lg border border-red-300/30 bg-red-900/40 p-3 text-center text-sm text-red-100" role="alert">
               {errorMessage}
             </div>
           )}
         </div>
         
         {/* Instructions */}
-        <div className="mt-4 text-black/70 text-center max-w-md">
-          <p>Share the room code with other players to join the game.</p>
-          <p className="mt-1">You need at least 2 players to start.</p>
+        <div className="mt-4 max-w-lg text-center text-sm text-white/60">
+          <p>Share the room code with friends. Games support 2–6 players; 4–6 is recommended.</p>
+          {gameState.players.length < 2 && <p className="mt-1 text-gold-light">At least 2 players are needed to start.</p>}
         </div>
       </div>
     );
   }
 
-  if (view === 'playing') {
+  if (view === 'playing' || view === 'gameOver') {
     return (
       <GameBoard
         gameState={gameState}
         onPlayCard={handlePlayCard}
         onRematch={handleRematch}
         errorMessage={errorMessage}
+        isConnected={connected}
       />
     );
   }
 
-  // Playing mode - return a simple placeholder
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-green-900 text-white">
-      <h1 className="text-4xl mb-8">Game View</h1>
-      <p>Game is now in progress! This is a placeholder for the actual game board.</p>
-      
-      <div className="mt-8">
-        <h2 className="text-2xl mb-2">Game Information:</h2>
-        <p>Current Player: {gameState.currentPlayer === gameState.currentPlayerId ? 'Your turn' : 'Waiting for other player'}</p>
-        <p>Players: {gameState.players.map(p => p.name).join(', ')}</p>
-        <p>Hand Size: {gameState.hand.length} cards</p>
-      </div>
-      
-      {gameState.gameOver && (
-        <div className="mt-8">
-          <h2 className="text-2xl mb-2">Game Over!</h2>
-          <p>Winner: {gameState.players.find(p => p.id === gameState.winner)?.name || 'Unknown'}</p>
-          <button
-            onClick={handleRematch}
-            className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-          >
-            Rematch
-          </button>
-        </div>
-      )}
-      
-      {errorMessage && (
-        <div className="mt-4 text-red-500 bg-red-900 p-2 rounded">
-          {errorMessage}
-        </div>
-      )}
-      
-      {showDebug && (
-        <div className="mt-4">
-          <button onClick={showState} className="text-xs underline">Debug</button>
-        </div>
-      )}
-    </div>
-  );
-}; 
+  return null;
+};

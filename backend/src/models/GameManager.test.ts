@@ -37,6 +37,23 @@ describe('GameManager', () => {
     expect(game!.getState().players[1].id).toBe(result.player!.id);
   });
 
+  test('should allow up to six players and reject additional players', () => {
+    const { gameCode } = gameManager.createGame('Player 1', 'socket1');
+
+    for (let playerNumber = 2; playerNumber <= 6; playerNumber += 1) {
+      const result = gameManager.joinGame(gameCode, `Player ${playerNumber}`, `socket${playerNumber}`);
+      expect(result.success).toBe(true);
+    }
+
+    const fullGame = gameManager.getGame(gameCode)!;
+    expect(fullGame.getState().players).toHaveLength(6);
+
+    const rejectedJoin = gameManager.joinGame(gameCode, 'Player 7', 'socket7');
+    expect(rejectedJoin.success).toBe(false);
+    expect(rejectedJoin.message).toBe('Game is full (maximum 6 players)');
+    expect(fullGame.getState().players).toHaveLength(6);
+  });
+
   test('should not join a non-existent game', () => {
     const result = gameManager.joinGame('invalid', 'Player 2', 'socket2');
 
@@ -214,4 +231,4 @@ describe('GameManager', () => {
     const playerInfo = gameManager.findPlayerBySocketId('invalid');
     expect(playerInfo).toBeNull();
   });
-}); 
+});

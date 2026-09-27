@@ -1,35 +1,64 @@
-import React from 'react';
 import PropTypes from 'prop-types';
 import { motion } from 'framer-motion';
 import { Card } from './Card';
 
-export const Hand = ({ cards, onPlayCard, isActive }) => {
+const SUIT_ORDER = ['clubs', 'diamonds', 'hearts', 'spades'];
+const RANK_ORDER = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+
+export const Hand = ({ cards, onPlayCard, isActive, leadSuit }) => {
+  const sortedCards = [...cards].sort((cardA, cardB) => {
+    const suitDifference = SUIT_ORDER.indexOf(cardA.suit) - SUIT_ORDER.indexOf(cardB.suit);
+    if (suitDifference !== 0) return suitDifference;
+    return RANK_ORDER.indexOf(cardA.value) - RANK_ORDER.indexOf(cardB.value);
+  });
+  const hasLeadSuit = Boolean(leadSuit && cards.some(card => card.suit === leadSuit));
+  const mustFollowSuit = isActive && Boolean(leadSuit) && hasLeadSuit;
+
   const container = {
     dealt: {
       transition: {
-        staggerChildren: 0.1
+        staggerChildren: 0.025
       }
     }
   };
 
   return (
-    <motion.div
-      variants={container}
-      initial="undealt"
-      animate="dealt"
-      className="flex flex-wrap justify-center items-center p-4 bg-green-800 rounded-lg"
-    >
-      {cards.map((card, index) => (
-        <Card
-          key={`${card.suit}-${card.value}`}
-          suit={card.suit}
-          value={card.value}
-          onClick={() => onPlayCard(card)}
-          disabled={!isActive}
-          index={index}
-        />
-      ))}
-    </motion.div>
+    <div className="space-y-2">
+      {isActive && leadSuit && cards.length > 0 && (
+        <p className="px-1 text-xs font-medium text-white/70" role="status">
+          {mustFollowSuit
+            ? `Follow suit: play a ${leadSuit} card.`
+            : `You have no ${leadSuit} cards; any card is playable.`}
+        </p>
+      )}
+      <motion.div
+        variants={container}
+        initial="undealt"
+        animate="dealt"
+        role="group"
+        aria-label="Your hand, sorted by suit and rank"
+        className="flex flex-wrap items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-felt-dark/50 p-3 sm:gap-2 sm:p-4"
+      >
+        {sortedCards.map((card, index) => {
+          const isUnplayable = mustFollowSuit && card.suit !== leadSuit;
+          const isPlayable = mustFollowSuit && card.suit === leadSuit;
+
+          return (
+            <Card
+              key={`${card.suit}-${card.value}`}
+              suit={card.suit}
+              value={card.value}
+              onClick={() => onPlayCard(card)}
+              disabled={!isActive || isUnplayable}
+              playable={isPlayable}
+              unplayable={isUnplayable}
+              index={index}
+              size="hand"
+            />
+          );
+        })}
+      </motion.div>
+    </div>
   );
 };
 
@@ -41,9 +70,10 @@ Hand.propTypes = {
     })
   ).isRequired,
   onPlayCard: PropTypes.func.isRequired,
-  isActive: PropTypes.bool
+  isActive: PropTypes.bool,
+  leadSuit: PropTypes.oneOf(['hearts', 'diamonds', 'clubs', 'spades']),
 };
 
 Hand.defaultProps = {
   isActive: false
-}; 
+};
