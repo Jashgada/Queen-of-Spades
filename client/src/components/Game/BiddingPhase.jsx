@@ -217,7 +217,7 @@ export const BiddingPhase = ({ gameState, currentPlayerId, isConnected, onBid, o
                     <li key={player.id} className="flex items-center justify-between gap-2 rounded-lg bg-black/15 px-3 py-2 text-sm">
                       <span className="truncate font-medium">{player.name}{player.id === currentPlayerId ? ' (You)' : ''}</span>
                       <span className={`shrink-0 text-xs ${passed ? 'text-white/40' : isActing ? 'text-gold-light' : 'text-white/55'}`}>
-                        {passed ? 'Passed' : isHighBidder ? `High · ${gameState.currentBid}` : isActing ? 'Acting' : 'In'}
+                        {player.connected === false ? 'Reconnecting' : passed ? 'Passed' : isHighBidder ? `High · ${gameState.currentBid}` : isActing ? 'Acting' : 'In'}
                       </span>
                     </li>
                   );

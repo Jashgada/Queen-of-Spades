@@ -27,6 +27,16 @@ export const gameService = {
     // Use the exact format from test.html
     socket.emit('game:join', { gameCode, playerName }, callback);
   },
+
+  resumeGame: (session, callback) => {
+    if (!socket.connected) socket.connect();
+    socket.emit('game:resume', session, callback);
+  },
+
+  leaveGame: (callback) => {
+    if (!socket.connected) socket.connect();
+    socket.emit('game:leave', callback);
+  },
   
   // Start a game
   startGame: (callback) => {

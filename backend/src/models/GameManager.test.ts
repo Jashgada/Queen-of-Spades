@@ -35,6 +35,25 @@ describe('GameManager', () => {
     expect(game).toBeDefined();
     expect(game!.getState().players).toHaveLength(2);
     expect(game!.getState().players[1].id).toBe(result.player!.id);
+    expect(game!.getPublicState().players[1]).not.toHaveProperty('resumeToken');
+    expect(game!.getPublicState().players[1]).not.toHaveProperty('socketId');
+  });
+
+  test('should restore a disconnected player using their resume token', () => {
+    const { gameCode } = gameManager.createGame('Player 1', 'socket1');
+    const joined = gameManager.joinGame(gameCode, 'Player 2', 'socket2');
+    const player = joined.player!;
+
+    expect(gameManager.markPlayerDisconnected(player.id, 'socket2')).toBeDefined();
+    expect(gameManager.getGame(gameCode)!.getState().players[1].connected).toBe(false);
+    expect(gameManager.resumePlayer(gameCode, player.id, 'invalid-token', 'socket3').success).toBe(false);
+
+    const resumed = gameManager.resumePlayer(gameCode, player.id, player.resumeToken, 'socket3');
+    expect(resumed.success).toBe(true);
+    expect(resumed.previousSocketId).toBe('socket2');
+    expect(resumed.player?.connected).toBe(true);
+    expect(resumed.player?.socketId).toBe('socket3');
+    expect(gameManager.removePlayer(player.id, 'socket2').success).toBe(false);
   });
 
   test('should allow up to six players and reject additional players', () => {

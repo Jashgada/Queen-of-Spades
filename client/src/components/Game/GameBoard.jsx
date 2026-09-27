@@ -74,7 +74,7 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
                         {player.name}{isYou ? ' (You)' : ''}
                       </p>
                       <p className="text-xs text-white/60">
-                        {player.handSize || 0} cards{isBidder ? ' · Bidder' : isRevealedPartner ? ' · Partner' : ''}
+                        {player.handSize || 0} cards{isBidder ? ' · Bidder' : isRevealedPartner ? ' · Partner' : ''}{player.connected === false ? ' · Reconnecting' : ''}
                       </p>
                     </div>
                   </div>

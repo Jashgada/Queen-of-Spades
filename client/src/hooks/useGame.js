@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from './useSocket';
 import gameService from '../services/gameService';
 
@@ -25,11 +25,34 @@ const INITIAL_STATE = {
   gameStatus: 'waiting',
   hostId: null
 };
+const RESUME_STORAGE_KEY = 'queen-of-spades:resume-session';
+
+const clearResumeSession = () => {
+  try {
+    localStorage.removeItem(RESUME_STORAGE_KEY);
+  } catch {
+    // Ignore browsers that block local storage access.
+  }
+};
+
+const saveResumeSession = (response) => {
+  if (!response?.gameCode || !response?.player?.id || !response?.player?.resumeToken) return;
+  try {
+    localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify({
+      gameCode: response.gameCode,
+      playerId: response.player.id,
+      resumeToken: response.player.resumeToken
+    }));
+  } catch {
+    // The live game can still proceed if browser storage is unavailable.
+  }
+};
 
 const mergePublicGameState = (previous, publicState) => ({
   ...previous,
   ...publicState,
   gameCode: publicState.code || publicState.gameCode || previous.gameCode,
+  hostId: publicState.players?.[0]?.id || previous.hostId,
   gameStatus: publicState.status || previous.gameStatus
 });
 
@@ -37,6 +60,7 @@ export const useGame = () => {
   const [gameState, setGameState] = useState(INITIAL_STATE);
   const [errorMessage, setErrorMessage] = useState(null);
   const { socket, connected } = useSocket();
+  const lastResumeSocketId = useRef(null);
 
   useEffect(() => {
     if (!connected) return undefined;
@@ -118,11 +142,28 @@ export const useGame = () => {
       }));
     };
 
+    const handlePlayerLeft = (data) => {
+      if (data?.gameState) {
+        applyState({ success: true, gameState: data.gameState });
+      } else if (data?.players) {
+        setGameState(previous => ({
+          ...previous,
+          players: data.players,
+          hostId: data.players[0]?.id || null,
+          gameStatus: data.players.length === 0 ? 'waiting' : previous.gameStatus
+        }));
+      }
+    };
+
     socket.on('game:playerJoined', handlePlayerJoined);
     socket.on('game:started', applyState);
     socket.on('game:biddingUpdated', applyState);
     socket.on('game:contractSet', applyState);
     socket.on('game:restarted', applyState);
+    socket.on('game:resumed', applyState);
+    socket.on('game:playerDisconnected', applyState);
+    socket.on('game:playerReconnected', applyState);
+    socket.on('game:playerLeft', handlePlayerLeft);
     socket.on('game:cardPlayed', handleCardPlayed);
     socket.on('game:roundComplete', handleRoundComplete);
     socket.on('game:over', handleGameOver);
@@ -135,6 +176,10 @@ export const useGame = () => {
       socket.off('game:biddingUpdated', applyState);
       socket.off('game:contractSet', applyState);
       socket.off('game:restarted', applyState);
+      socket.off('game:resumed', applyState);
+      socket.off('game:playerDisconnected', applyState);
+      socket.off('game:playerReconnected', applyState);
+      socket.off('game:playerLeft', handlePlayerLeft);
       socket.off('game:cardPlayed', handleCardPlayed);
       socket.off('game:roundComplete', handleRoundComplete);
       socket.off('game:over', handleGameOver);
@@ -143,17 +188,55 @@ export const useGame = () => {
     };
   }, [connected, socket]);
 
+  useEffect(() => {
+    if (!connected || !socket.id || lastResumeSocketId.current === socket.id) return;
+    lastResumeSocketId.current = socket.id;
+
+    let session;
+    try {
+      session = JSON.parse(localStorage.getItem(RESUME_STORAGE_KEY) || 'null');
+    } catch {
+      clearResumeSession();
+      return;
+    }
+    if (!session?.gameCode || !session?.playerId || !session?.resumeToken) return;
+
+    gameService.resumeGame(session, response => {
+      if (!response?.success) {
+        clearResumeSession();
+        setGameState(INITIAL_STATE);
+        setErrorMessage(response?.message || 'Could not restore the saved game');
+        return;
+      }
+
+      setGameState(previous => ({
+        ...mergePublicGameState(previous, response.gameState),
+        hand: response.hand || [],
+        currentPlayerId: response.playerId,
+        hostId: response.gameState.players?.[0]?.id || previous.hostId
+      }));
+      setErrorMessage(null);
+    });
+  }, [connected, socket]);
+
   const createGame = useCallback((playerName) => {
     setErrorMessage(null);
     return new Promise((resolve, reject) => {
       gameService.createGame(playerName, response => {
         if (response?.success) {
+          saveResumeSession(response);
+          const player = {
+            id: response.player.id,
+            name: response.player.name,
+            handSize: response.player.handSize,
+            connected: true
+          };
           setGameState(() => ({
             ...INITIAL_STATE,
             gameCode: response.gameCode,
-            currentPlayerId: response.player.id,
-            hostId: response.player.id,
-            players: [response.player]
+            currentPlayerId: player.id,
+            hostId: player.id,
+            players: [player]
           }));
           resolve(response);
           return;
@@ -170,12 +253,19 @@ export const useGame = () => {
     return new Promise((resolve, reject) => {
       gameService.joinGame(gameCode, playerName, response => {
         if (response?.success) {
+          saveResumeSession(response);
+          const player = {
+            id: response.player.id,
+            name: response.player.name,
+            handSize: response.player.handSize,
+            connected: true
+          };
           setGameState(previous => ({
             ...INITIAL_STATE,
             gameCode: response.gameCode,
-            currentPlayerId: response.player.id,
+            currentPlayerId: player.id,
             hostId: response.hostId || previous.hostId,
-            players: response.players || [response.player]
+            players: response.players || [player]
           }));
           resolve(response);
           return;
@@ -218,6 +308,10 @@ export const useGame = () => {
   }, [gameState.currentPlayer, runGameAction]);
 
   const rematch = useCallback(() => runGameAction('rematch'), [runGameAction]);
+  const leaveGame = useCallback(() => {
+    clearResumeSession();
+    return runGameAction('leaveGame').finally(() => setGameState(INITIAL_STATE));
+  }, [runGameAction]);
   const isCurrentPlayer = useCallback(() => gameState.currentPlayer === gameState.currentPlayerId, [gameState.currentPlayer, gameState.currentPlayerId]);
 
   return {
@@ -231,6 +325,7 @@ export const useGame = () => {
     setContract,
     playCard,
     rematch,
+    leaveGame,
     isCurrentPlayer
   };
 };

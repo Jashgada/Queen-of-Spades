@@ -13,6 +13,8 @@ export interface Player {
   id: string;
   name: string;
   socketId: string;
+  resumeToken: string;
+  connected: boolean;
   handSize: number;
 }
 
@@ -83,8 +85,14 @@ export interface GameState {
 }
 
 export type PublicGameState = Omit<GameState, 'hands' | 'players'> & {
-  players: Omit<Player, 'socketId'>[];
+  players: Omit<Player, 'socketId' | 'resumeToken'>[];
 };
+
+export interface ResumeGameParams {
+  gameCode: string;
+  playerId: string;
+  resumeToken: string;
+}
 
 export interface BidParams {
   amount: number;
@@ -119,6 +127,7 @@ export interface GameResponse {
     id: string;
     name: string;
     handSize: number;
+    resumeToken?: string;
   };
   players?: Player[];
   gameState?: GameState;

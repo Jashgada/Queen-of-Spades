@@ -56,6 +56,40 @@ export class GameManager {
     return { success: true, player, message: 'Joined game successfully', game: foundGame };
   }
 
+  markPlayerDisconnected(playerId: string, socketId: string): { gameCode: string; game: Game } | undefined {
+    const gameCode = this.playerGameMap.get(playerId);
+    const game = gameCode ? this.games.get(gameCode) : undefined;
+    const player = game?.getState().players.find(candidate => candidate.id === playerId && candidate.socketId === socketId);
+    if (!gameCode || !game || !player) return undefined;
+
+    game.updatePlayerConnection(playerId, socketId, false);
+    return { gameCode, game };
+  }
+
+  resumePlayer(gameCode: string, playerId: string, resumeToken: string, socketId: string): {
+    success: boolean;
+    message: string;
+    gameCode?: string;
+    game?: Game;
+    player?: Player;
+    previousSocketId?: string;
+  } {
+    const upperGameCode = gameCode.toUpperCase();
+    if (this.playerGameMap.get(playerId) !== upperGameCode) {
+      return { success: false, message: 'Saved game session was not found' };
+    }
+
+    const game = this.games.get(upperGameCode);
+    const player = game?.getState().players.find(candidate => candidate.id === playerId);
+    if (!game || !player || player.resumeToken !== resumeToken) {
+      return { success: false, message: 'Saved game session is invalid or expired' };
+    }
+
+    const previousSocketId = player.socketId;
+    game.updatePlayerConnection(playerId, socketId, true);
+    return { success: true, message: 'Game session restored', gameCode: upperGameCode, game, player, previousSocketId };
+  }
+
   // Start a game
   startGame(gameCode: string): { success: boolean; message: string; game?: Game } {
     const upperGameCode = gameCode.toUpperCase();
@@ -131,39 +165,7 @@ export class GameManager {
   } {
     try {
       console.log(`Attempting to remove player ${playerId} (socket ${socketId})`);
-      
-      // For testing purposes, we'll override the validation
-      if (playerId.startsWith('test')) {
-        const gameCode = this.playerGameMap.get(playerId);
-        if (!gameCode) {
-          return { success: false, message: 'Player not in a game' };
-        }
 
-        const game = this.games.get(gameCode);
-        if (!game) {
-          this.playerGameMap.delete(playerId);
-          return { success: false, message: 'Game not found' };
-        }
-
-        // Remove the player
-        game.removePlayer(playerId);
-        this.playerGameMap.delete(playerId);
-
-        // If no players left, remove the game
-        if (game.getState().players.length === 0) {
-          this.games.delete(gameCode);
-          return { success: true, message: 'Player removed and game deleted', gameCode };
-        }
-
-        return { 
-          success: true, 
-          message: 'Player removed from game', 
-          gameCode, 
-          remainingPlayers: game.getState().players 
-        };
-      }
-
-      // Normal validation
       const gameCode = this.playerGameMap.get(playerId);
       if (!gameCode) {
         console.log(`Player ${playerId} is not in any game`);
@@ -182,7 +184,7 @@ export class GameManager {
       const gameState = game.getState();
       console.log(`Game ${gameCode} has ${gameState.players.length} players`);
       
-      const player = gameState.players.find(p => p.id === playerId || p.socketId === socketId);
+      const player = gameState.players.find(p => p.id === playerId && p.socketId === socketId);
       if (!player) {
         console.log(`Player ${playerId} (socket ${socketId}) not found in game ${gameCode}`);
         return { success: false, message: 'Player not found in game' };

@@ -47,7 +47,7 @@ export class Game {
     const { hands: _hands, players, ...publicState } = this.state;
     return {
       ...publicState,
-      players: players.map(({ socketId: _socketId, ...player }) => player)
+      players: players.map(({ socketId: _socketId, resumeToken: _resumeToken, ...player }) => player)
     };
   }
 
@@ -64,12 +64,22 @@ export class Game {
       id: nanoid(8),
       name,
       socketId,
+      resumeToken: nanoid(32),
+      connected: true,
       handSize: 0
     };
 
     this.state.players.push(player);
     this.state.hands[player.id] = [];
     this.state.scores[player.id] = 0;
+    return player;
+  }
+
+  updatePlayerConnection(playerId: string, socketId: string, connected: boolean): Player | undefined {
+    const player = this.state.players.find(candidate => candidate.id === playerId);
+    if (!player) return undefined;
+    player.socketId = socketId;
+    player.connected = connected;
     return player;
   }
 

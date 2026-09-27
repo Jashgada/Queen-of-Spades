@@ -6,7 +6,7 @@ import { useGame } from '../../hooks/useGame';
 import { useSocket } from '../../hooks/useSocket';
 
 export const Game = () => {
-  const { gameState, errorMessage, createGame, joinGame, startGame, placeBid, passBid, setContract, playCard, rematch, isCurrentPlayer } = useGame();
+  const { gameState, errorMessage, createGame, joinGame, startGame, placeBid, passBid, setContract, playCard, rematch, leaveGame, isCurrentPlayer } = useGame();
   const { connected } = useSocket();
   const [playerName, setPlayerName] = useState('');
   const [gameCode, setGameCode] = useState('');
@@ -17,7 +17,7 @@ export const Game = () => {
 
   // When gameState.gameCode is set, transition to the lobby
   useEffect(() => {
-    if (gameState.gameCode && (view === 'create' || view === 'join')) {
+    if (gameState.gameCode && (view === 'create' || view === 'join' || view === 'home')) {
       console.log('[Game] Game code received, transitioning to lobby:', gameState.gameCode);
       setView('lobby');
       setIsLoading(false);
@@ -56,8 +56,10 @@ export const Game = () => {
       setView('playing');
     } else if (gameStatus === 'finished') {
       setView('gameOver');
+    } else if (gameStatus === 'waiting' && gameState.gameCode) {
+      setView('lobby');
     }
-  }, [gameStatus]);
+  }, [gameStatus, gameState.gameCode]);
 
   // Create a new game
   const handleCreateGame = async (e) => {
@@ -171,6 +173,15 @@ export const Game = () => {
     }
   };
 
+  const handleLeaveGame = async () => {
+    try {
+      await leaveGame();
+    } catch (error) {
+      console.error('[Game] Error leaving game:', error);
+    }
+    setView('home');
+  };
+
   if (gameState.gameStatus === 'bidding' || gameState.gameStatus === 'contract') {
     return (
       <BiddingPhase
@@ -225,6 +236,7 @@ export const Game = () => {
             <span aria-hidden="true">·</span>
             <span>4–6 recommended</span>
           </div>
+          {errorMessage && <p className="mt-4 rounded-lg border border-red-300/30 bg-red-900/40 p-3 text-center text-sm text-red-100" role="alert">{errorMessage}</p>}
         </div>
 
         {/* Footer */}
@@ -430,6 +442,7 @@ export const Game = () => {
                   <div className="ml-3 min-w-0 truncate font-medium text-white">
                     {player.name}
                     {player.id === gameState.currentPlayerId && ' (You)'}
+                    {player.connected === false && <span className="ml-2 text-xs text-red-200">Reconnecting…</span>}
                   </div>
                   {player.id === gameState.hostId && (
                     <div className="ml-auto flex items-center gap-1 text-xs font-semibold text-gold-light">
@@ -445,7 +458,7 @@ export const Game = () => {
           {/* Actions */}
           <div className="flex flex-col-reverse gap-2 sm:flex-row">
             <button
-              onClick={() => setView('home')}
+              onClick={handleLeaveGame}
               className="flex-1 rounded-lg border border-white/15 px-3 py-2.5 font-medium text-white/80 transition-colors hover:bg-white/10"
             >
               Leave

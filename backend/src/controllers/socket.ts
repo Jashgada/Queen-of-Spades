@@ -1,9 +1,11 @@
 import { Server, Socket } from 'socket.io';
 import { GameManager } from '../models/GameManager';
-import { BidParams, ContractParams, CreateGameParams, JoinGameParams, PlayCardParams } from '../types';
+import { BidParams, ContractParams, CreateGameParams, JoinGameParams, PlayCardParams, ResumeGameParams } from '../types';
 
 // Create a singleton instance of GameManager
 const gameManager = new GameManager();
+const RECONNECT_GRACE_MS = 60_000;
+const disconnectTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export const setupSocketHandlers = (io: Server) => {
   io.on('connection', (socket: Socket) => {
@@ -32,7 +34,8 @@ export const setupSocketHandlers = (io: Server) => {
             player: {
               id: player.id,
               name: player.name,
-              handSize: player.handSize
+              handSize: player.handSize,
+              resumeToken: player.resumeToken
             },
             message: 'Game created successfully'
           });
@@ -75,7 +78,8 @@ export const setupSocketHandlers = (io: Server) => {
         const players = result.game!.getState().players.map(p => ({
           id: p.id,
           name: p.name,
-          handSize: p.handSize
+          handSize: p.handSize,
+          connected: p.connected
         }));
         
         console.log(`Player ${playerName} (${result.player!.id}) successfully joined game: ${gameCode}`);
@@ -89,7 +93,8 @@ export const setupSocketHandlers = (io: Server) => {
             player: {
               id: result.player!.id,
               name: result.player!.name,
-              handSize: result.player!.handSize
+              handSize: result.player!.handSize,
+              resumeToken: result.player!.resumeToken
             },
             players,
             message: 'Joined game successfully'
@@ -102,7 +107,8 @@ export const setupSocketHandlers = (io: Server) => {
           player: {
             id: result.player!.id,
             name: result.player!.name,
-            handSize: result.player!.handSize
+            handSize: result.player!.handSize,
+            connected: result.player!.connected
           },
           players,
           message: `${playerName} joined the game`
@@ -116,6 +122,77 @@ export const setupSocketHandlers = (io: Server) => {
           });
         }
       }
+    });
+
+    socket.on('game:resume', (params: ResumeGameParams, callback) => {
+      const result = gameManager.resumePlayer(
+        params?.gameCode || '',
+        params?.playerId || '',
+        params?.resumeToken || '',
+        socket.id
+      );
+      if (!result.success || !result.game || !result.player || !result.gameCode) {
+        callback?.({ success: false, message: result.message });
+        return;
+      }
+
+      const pendingTimer = disconnectTimers.get(result.player.id);
+      if (pendingTimer) clearTimeout(pendingTimer);
+      disconnectTimers.delete(result.player.id);
+
+      if (result.previousSocketId && result.previousSocketId !== socket.id) {
+        const previousSocket = io.sockets.sockets.get(result.previousSocketId);
+        if (previousSocket) {
+          previousSocket.leave(result.gameCode);
+          previousSocket.disconnect(true);
+        }
+      }
+
+      socket.join(result.gameCode);
+      const gameState = result.game.getState();
+      const playerHand = gameState.hands[result.player.id] || [];
+      socket.emit('game:playerState', { hand: playerHand, currentPlayerId: result.player.id });
+      socket.emit('game:resumed', { success: true, gameState: result.game.getPublicState() });
+      socket.to(result.gameCode).emit('game:playerReconnected', {
+        playerId: result.player.id,
+        gameState: result.game.getPublicState()
+      });
+
+      callback?.({
+        success: true,
+        gameCode: result.gameCode,
+        playerId: result.player.id,
+        hand: playerHand,
+        gameState: result.game.getPublicState()
+      });
+    });
+
+    socket.on('game:leave', (callback) => {
+      const playerInfo = gameManager.findPlayerBySocketId(socket.id);
+      if (!playerInfo) {
+        callback?.({ success: false, message: 'Player not found in a game' });
+        return;
+      }
+
+      const timer = disconnectTimers.get(playerInfo.playerId);
+      if (timer) clearTimeout(timer);
+      disconnectTimers.delete(playerInfo.playerId);
+
+      const result = gameManager.removePlayer(playerInfo.playerId, socket.id);
+      if (!result.success) {
+        callback?.({ success: false, message: result.message });
+        return;
+      }
+
+      socket.leave(playerInfo.gameCode);
+      const game = gameManager.getGame(playerInfo.gameCode);
+      io.in(playerInfo.gameCode).emit('game:playerLeft', {
+        playerId: playerInfo.playerId,
+        gameState: game?.getPublicState(),
+        players: game?.getPublicState().players || [],
+        message: 'A player left the game'
+      });
+      callback?.({ success: true, message: 'Left game successfully' });
     });
 
     // Handle starting a game
@@ -440,43 +517,40 @@ export const setupSocketHandlers = (io: Server) => {
       try {
         console.log('User disconnected:', socket.id);
 
-        // Find the player and remove them from their game
         const playerInfo = gameManager.findPlayerBySocketId(socket.id);
-        if (playerInfo) {
-          const { playerId, gameCode } = playerInfo;
-          console.log(`Player ${playerId} in game ${gameCode} disconnected`);
-          
-          try {
-            const result = gameManager.removePlayer(playerId, socket.id);
-
-            if (result.success) {
-              console.log(`Successfully removed player ${playerId} from game ${gameCode}`);
-              
-              if (result.remainingPlayers && result.remainingPlayers.length > 0) {
-                console.log(`Notifying ${result.remainingPlayers.length} remaining players in game ${gameCode}`);
-                
-                // Notify remaining players
-                socket.to(gameCode).emit('game:playerLeft', {
-                  playerId,
-                  players: result.remainingPlayers.map(p => ({
-                    id: p.id,
-                    name: p.name,
-                    handSize: p.handSize
-                  })),
-                  message: 'A player has left the game'
-                });
-              } else {
-                console.log(`No players remaining in game ${gameCode} after player ${playerId} left`);
-              }
-            } else {
-              console.log(`Failed to remove player ${playerId} from game: ${result.message}`);
-            }
-          } catch (removeError) {
-            console.error(`Error removing player ${playerId} from game ${gameCode}:`, removeError);
-          }
-        } else {
+        if (!playerInfo) {
           console.log(`No game found for disconnected socket ${socket.id}`);
+          return;
         }
+
+        const { playerId, gameCode } = playerInfo;
+        const disconnected = gameManager.markPlayerDisconnected(playerId, socket.id);
+        if (!disconnected) return;
+
+        const previousTimer = disconnectTimers.get(playerId);
+        if (previousTimer) clearTimeout(previousTimer);
+
+        io.to(gameCode).emit('game:playerDisconnected', {
+          playerId,
+          gracePeriodMs: RECONNECT_GRACE_MS,
+          gameState: disconnected.game.getPublicState()
+        });
+
+        const timer = setTimeout(() => {
+          disconnectTimers.delete(playerId);
+          const result = gameManager.removePlayer(playerId, socket.id);
+          if (!result.success) return;
+
+          const game = gameManager.getGame(gameCode);
+          io.to(gameCode).emit('game:playerLeft', {
+            playerId,
+            gameState: game?.getPublicState(),
+            players: game?.getPublicState().players || [],
+            message: 'The reconnect window expired; the player was removed from the game'
+          });
+        }, RECONNECT_GRACE_MS);
+        timer.unref?.();
+        disconnectTimers.set(playerId, timer);
       } catch (error) {
         // Catch-all error handler to prevent server crashes
         console.error('Unhandled error in disconnect handler:', error);
