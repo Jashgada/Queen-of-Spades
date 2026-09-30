@@ -65,11 +65,16 @@ export interface GameState {
   currentRound: Play[];
   rounds: Round[];
   roundNumber: number;
+  dealNumber: number;
   currentPlayer: string | null;
   scores: {
     [playerId: string]: number;
   };
+  matchScores: {
+    [playerId: string]: number;
+  };
   gameOver: boolean;
+  matchEnded: boolean;
   winner: string | null;
   lastRound: {
     winner: string;

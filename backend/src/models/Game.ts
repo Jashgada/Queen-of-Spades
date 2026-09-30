@@ -72,6 +72,7 @@ export class Game {
     this.state.players.push(player);
     this.state.hands[player.id] = [];
     this.state.scores[player.id] = 0;
+    this.state.matchScores[player.id] = 0;
     return player;
   }
 
@@ -88,6 +89,7 @@ export class Game {
     this.state.players = this.state.players.filter(player => player.id !== playerId);
     delete this.state.hands[playerId];
     delete this.state.scores[playerId];
+    delete this.state.matchScores[playerId];
     this.partnerPlayerIds = this.partnerPlayerIds.filter(id => id !== playerId);
 
     if (this.state.players.length === 0) {
@@ -118,6 +120,7 @@ export class Game {
     }
 
     this.resetDealState();
+    this.state.dealNumber += 1;
     this.dealCards();
     this.state.status = 'bidding';
     this.state.currentBid = 75;
@@ -288,18 +291,37 @@ export class Game {
   }
 
   restart(): void {
+    if (this.state.status !== 'finished' || this.state.matchEnded) {
+      throw new Error('The current deal is not finished');
+    }
     const players = this.state.players;
     const code = this.state.code;
-    this.state = this.createInitialState(code, players);
+    const matchScores = this.state.matchScores;
+    const dealNumber = this.state.dealNumber;
+    this.state = this.createInitialState(code, players, matchScores, dealNumber);
     this.start();
   }
 
-  private createInitialState(code: string, players: Player[]): GameState {
+  endMatch(): void {
+    if (this.state.status !== 'finished') {
+      throw new Error('A deal must be finished before ending the match');
+    }
+    this.state.matchEnded = true;
+  }
+
+  private createInitialState(
+    code: string,
+    players: Player[],
+    existingMatchScores: Record<string, number> = {},
+    dealNumber = 0
+  ): GameState {
     const hands: Record<string, Card[]> = {};
     const scores: Record<string, number> = {};
+    const matchScores: Record<string, number> = {};
     players.forEach(player => {
       hands[player.id] = [];
       scores[player.id] = 0;
+      matchScores[player.id] = existingMatchScores[player.id] || 0;
     });
 
     return {
@@ -310,9 +332,12 @@ export class Game {
       currentRound: [],
       rounds: [],
       roundNumber: 0,
+      dealNumber,
       currentPlayer: null,
       scores,
+      matchScores,
       gameOver: false,
+      matchEnded: false,
       winner: null,
       winningTeamPlayerIds: [],
       lastRound: null,
@@ -485,6 +510,10 @@ export class Game {
       signedPoints: successful ? this.state.contract.bid : -this.state.contract.bid,
       winningTeamPlayerIds
     };
+
+    contractTeamIds.forEach(playerId => {
+      this.state.matchScores[playerId] = (this.state.matchScores[playerId] || 0) + contractResult.signedPoints;
+    });
 
     this.state.gameOver = true;
     this.state.status = 'finished';

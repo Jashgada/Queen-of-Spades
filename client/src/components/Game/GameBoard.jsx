@@ -33,7 +33,7 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
             </div>
           )}
           <div className="rounded-xl bg-white/5 px-3 py-2 text-sm">
-            <span className="font-semibold text-gold-light">Round {roundNumber}</span>
+            <span className="font-semibold text-gold-light">Deal {gameState.dealNumber} · Round {roundNumber}</span>
             <span className="mx-2 text-white/30">·</span>
             <span className="text-white/70">{currentRound.length}/{players.length} played</span>
           </div>
@@ -138,9 +138,11 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
           <ScoreBoard
             players={players}
             scores={gameState.scores}
+            matchScores={gameState.matchScores}
             currentPlayerId={gameState.currentPlayerId}
             activePlayerId={currentPlayer}
             bid={contract?.bid || gameState.currentBid || 75}
+            dealNumber={gameState.dealNumber}
           />
           <p className="rounded-2xl border border-gold/30 bg-felt-dark/60 p-4 text-sm leading-relaxed text-white/70">
             <span className="mb-1 block font-semibold text-gold-light">Contract</span>
@@ -182,8 +184,11 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
             winningTeamPlayerIds={gameState.winningTeamPlayerIds}
             contractResult={gameState.contractResult}
             scores={gameState.scores}
+            matchScores={gameState.matchScores}
             players={players}
             currentPlayerId={gameState.currentPlayerId}
+            isHost={gameState.hostId === gameState.currentPlayerId}
+            dealNumber={gameState.dealNumber}
             onRematch={onRematch}
           />
         )}
@@ -220,9 +225,12 @@ GameBoard.propTypes = {
       })
     ).isRequired,
     scores: PropTypes.object.isRequired,
+    matchScores: PropTypes.object,
     rounds: PropTypes.array,
     roundNumber: PropTypes.number,
+    dealNumber: PropTypes.number,
     gameCode: PropTypes.string,
+    hostId: PropTypes.string,
     gameOver: PropTypes.bool,
     winner: PropTypes.string,
     winningTeamPlayerIds: PropTypes.arrayOf(PropTypes.string),

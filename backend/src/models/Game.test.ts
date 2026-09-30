@@ -126,6 +126,12 @@ describe('Game bidding and contract phases', () => {
     const successResult = successful.game.playCard(successful.players[1].id, { suit: 'hearts', value: '2' });
     expect(successResult.contractResult).toMatchObject({ successful: true, signedPoints: 5 });
     expect(successState.winningTeamPlayerIds).toEqual([successful.players[0].id]);
+    expect(successState.matchScores[successful.players[0].id]).toBe(5);
+
+    successful.game.restart();
+    expect(successful.game.getState().dealNumber).toBe(successState.dealNumber + 1);
+    expect(successful.game.getState().scores[successful.players[0].id]).toBe(0);
+    expect(successful.game.getState().matchScores[successful.players[0].id]).toBe(5);
 
     const failed = makeGame();
     failed.game.submitBid(failed.players[1].id, null);
@@ -139,6 +145,7 @@ describe('Game bidding and contract phases', () => {
     const failedResult = failed.game.playCard(failed.players[1].id, { suit: 'hearts', value: '2' });
     expect(failedResult.contractResult).toMatchObject({ successful: false, signedPoints: -75 });
     expect(failedState.winningTeamPlayerIds).toEqual([failed.players[1].id]);
+    expect(failedState.matchScores[failed.players[0].id]).toBe(-75);
   });
 
   test('counts called partners in the bidder team’s contract points', () => {
@@ -162,6 +169,8 @@ describe('Game bidding and contract phases', () => {
 
     expect(result.contractResult).toMatchObject({ bidderTeamPoints: 20, successful: true, signedPoints: 20 });
     expect(state.winningTeamPlayerIds).toEqual([players[0].id, players[1].id]);
+    expect(state.matchScores[players[0].id]).toBe(20);
+    expect(state.matchScores[players[1].id]).toBe(20);
   });
 
   test.each([

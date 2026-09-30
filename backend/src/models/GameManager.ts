@@ -139,8 +139,36 @@ export class GameManager {
       return { success: false, message: 'Game not found' };
     }
 
-    game.restart();
-    return { success: true, message: 'Game restarted successfully', game };
+    try {
+      game.restart();
+      return { success: true, message: 'Next deal started successfully', game };
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : 'Failed to start next deal' };
+    }
+  }
+
+  endMatch(gameCode: string, playerId: string): { success: boolean; message: string; game?: Game } {
+    const game = this.getGame(gameCode);
+    if (!game) return { success: false, message: 'Game not found' };
+    if (game.getState().players[0]?.id !== playerId) {
+      return { success: false, message: 'Only the host can end the match' };
+    }
+
+    try {
+      game.endMatch();
+      return { success: true, message: 'Match ended successfully', game };
+    } catch (error) {
+      return { success: false, message: error instanceof Error ? error.message : 'Unable to end match' };
+    }
+  }
+
+  deleteGame(gameCode: string): void {
+    const upperGameCode = gameCode.toUpperCase();
+    const game = this.games.get(upperGameCode);
+    if (!game) return;
+
+    game.getState().players.forEach(player => this.playerGameMap.delete(player.id));
+    this.games.delete(upperGameCode);
   }
 
   // Get a game by code

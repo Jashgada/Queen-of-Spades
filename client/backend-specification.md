@@ -11,7 +11,8 @@ The backend is authoritative for bidding, contracts, card legality, rounds, poin
 - Bids increase in multiples of 5 up to 150. Passing is permanent; the last active bidder wins.
 - The winning bidder selects the required exact partner card calls (0 at 2 players, 1 at 3–4, 2 at 5–6) and a cut suit.
 - The bidder leads play. A round consists of one card per player. Players must follow suit when possible; the cut suit is trump and may be played only when void in the led suit.
-- The deal ends after all cards are played. If the bidder’s team captures at least the bid, that team earns the bid amount. Otherwise it loses that amount and the defending team wins.
+- The deal ends after all cards are played. If the bidder’s team captures at least the bid, each member earns the bid amount. Otherwise each loses that amount and the defending team wins.
+- Match scores accumulate per player across deals. Only the host may start another deal; there is no automatic match-end condition.
 
 ## Client-to-server events
 
@@ -40,4 +41,4 @@ All action events acknowledge with `{ success, message?, gameState? }`. Invalid 
 
 ## Public game state
 
-The public state includes the room code, players (without socket IDs), phase, current player, round number, current round, completed rounds, card-point totals, bid history, high bidder, passed players, partner card calls, cut suit, revealed partner IDs, and contract result when complete. It never includes other players’ hands or unrevealed partner identities.
+The public state includes the room code, players (without socket IDs or resume tokens), phase, current player, deal and round numbers, current round, completed rounds, per-deal card-point totals, cumulative per-player match scores, bid history, high bidder, passed players, partner card calls, cut suit, revealed partner IDs, and contract result when complete. It never includes other players’ hands or unrevealed partner identities.

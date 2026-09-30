@@ -1,10 +1,10 @@
 import PropTypes from 'prop-types';
-export const ScoreBoard = ({ players, scores, currentPlayerId, activePlayerId, bid }) => {
+export const ScoreBoard = ({ players, scores, matchScores, currentPlayerId, activePlayerId, bid, dealNumber }) => {
   return (
     <section className="rounded-2xl border border-white/10 bg-green-900/70 p-4 shadow-lg sm:p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-white">Scoreboard</h2>
-        <span className="text-xs text-white/60">Bid target {bid}</span>
+        <h2 className="text-lg font-bold text-white">Match scores</h2>
+        <span className="text-right text-xs text-white/60">Deal {dealNumber}<br />Bid {bid}</span>
       </div>
 
       <ol className="space-y-3">
@@ -24,8 +24,12 @@ export const ScoreBoard = ({ players, scores, currentPlayerId, activePlayerId, b
                     {player.name}{isYou ? ' (You)' : ''}
                   </p>
                   {isCurrentTurn && <p className="mt-0.5 text-xs text-yellow-200">Playing now</p>}
+                  <p className="mt-1 text-xs text-white/50">{score} card points this deal</p>
                 </div>
-                <span className="shrink-0 text-xl font-bold tabular-nums text-yellow-300">{score}</span>
+                <div className="shrink-0 text-right">
+                  <span className="block text-xl font-bold tabular-nums text-yellow-300">{matchScores[player.id] || 0}</span>
+                  <span className="text-[10px] uppercase tracking-wider text-white/45">match</span>
+                </div>
               </div>
             </li>
           );
@@ -43,11 +47,15 @@ ScoreBoard.propTypes = {
     })
   ).isRequired,
   scores: PropTypes.object.isRequired,
+  matchScores: PropTypes.object,
   currentPlayerId: PropTypes.string,
   activePlayerId: PropTypes.string,
   bid: PropTypes.number,
+  dealNumber: PropTypes.number,
 };
 
 ScoreBoard.defaultProps = {
+  matchScores: {},
   bid: 75,
+  dealNumber: 1,
 };

@@ -68,7 +68,7 @@ export const BiddingPhase = ({ gameState, currentPlayerId, isConnected, onBid, o
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-white/60">
                 <span>Room <span className="font-mono font-semibold tracking-wider text-white/85">{gameState.gameCode}</span></span>
                 <CopyRoomCodeButton code={gameState.gameCode} />
-                <span>· {players.length} players</span>
+                <span>· Deal {gameState.dealNumber} · {players.length} players</span>
               </div>
             </div>
           </div>
@@ -216,8 +216,9 @@ export const BiddingPhase = ({ gameState, currentPlayerId, isConnected, onBid, o
                   return (
                     <li key={player.id} className="flex items-center justify-between gap-2 rounded-lg bg-black/15 px-3 py-2 text-sm">
                       <span className="truncate font-medium">{player.name}{player.id === currentPlayerId ? ' (You)' : ''}</span>
-                      <span className={`shrink-0 text-xs ${passed ? 'text-white/40' : isActing ? 'text-gold-light' : 'text-white/55'}`}>
-                        {player.connected === false ? 'Reconnecting' : passed ? 'Passed' : isHighBidder ? `High · ${gameState.currentBid}` : isActing ? 'Acting' : 'In'}
+                      <span className={`shrink-0 text-right text-xs ${passed ? 'text-white/40' : isActing ? 'text-gold-light' : 'text-white/55'}`}>
+                        <span className="block">{player.connected === false ? 'Reconnecting' : passed ? 'Passed' : isHighBidder ? `High · ${gameState.currentBid}` : isActing ? 'Acting' : 'In'}</span>
+                        <span className="block text-[10px] text-gold-light">Match {gameState.matchScores?.[player.id] || 0}</span>
                       </span>
                     </li>
                   );

@@ -70,7 +70,7 @@ The winning bidder calls 0, 1, or 2 exact partner cards (depending on table size
 
 After the contract is set, the bidder leads. A **round** is one card played by each player. Players must follow the suit led when possible; otherwise they may play any card. The highest cut-suit card wins if one was played; otherwise the highest card of the led suit wins. The round winner leads the next round.
 
-The five, ten, ace, and queen of spades are worth 5, 10, 15, and 30 points respectively, for 150 points total in the deck. At the end of the deal, the bidder’s team succeeds by collecting at least the bid. A successful contract earns the bidder’s team the bid amount; a failed contract costs that team the bid amount and the defending team wins. Scores do not carry over between deals yet.
+The five, ten, ace, and queen of spades are worth 5, 10, 15, and 30 points respectively, for 150 points total in the deck. At the end of the deal, the bidder’s team succeeds by collecting at least the bid. Every member of that team individually gains the bid amount on success or loses it on failure; the defending team wins a failed contract. Match scores carry over between deals, and the host starts each next deal. Matches have no automatic end condition yet.
 
 ### Tech Stack
 After some quick research, I have decided on making this app on vanilla js/react for the frontend, use express.js for the backend and socket.io for networking.

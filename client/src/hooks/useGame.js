@@ -11,6 +11,8 @@ const INITIAL_STATE = {
   currentRound: [],
   rounds: [],
   scores: {},
+  matchScores: {},
+  dealNumber: 0,
   roundNumber: 0,
   gameOver: false,
   winner: null,
@@ -96,6 +98,8 @@ export const useGame = () => {
           currentRound,
           currentPlayer: data.nextPlayer,
           scores: data.scores || previous.scores,
+          matchScores: data.matchScores || previous.matchScores,
+          dealNumber: data.dealNumber ?? previous.dealNumber,
           contract: data.contract || previous.contract,
           gameOver: data.gameOver ?? previous.gameOver,
           winner: data.winner ?? previous.winner,
@@ -113,6 +117,8 @@ export const useGame = () => {
         currentRound: [],
         rounds: data.round ? [...previous.rounds, data.round] : previous.rounds,
         scores: data.scores || previous.scores,
+        matchScores: data.matchScores || previous.matchScores,
+        dealNumber: data.dealNumber ?? previous.dealNumber,
         lastRound: data.lastRound || { winner: data.winner, points: data.points },
         roundNumber: data.roundNumber ?? previous.roundNumber
       }));
@@ -127,6 +133,8 @@ export const useGame = () => {
         winningTeamPlayerIds: data.winningTeamPlayerIds || [],
         contractResult: data.contractResult || previous.contractResult,
         scores: data.scores || previous.scores,
+        matchScores: data.matchScores || previous.matchScores,
+        dealNumber: data.dealNumber ?? previous.dealNumber,
         gameStatus: 'finished'
       }));
     };

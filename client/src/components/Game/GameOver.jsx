@@ -1,9 +1,8 @@
 import PropTypes from 'prop-types';
 import { motion } from 'framer-motion';
 
-export const GameOver = ({ winner, winningTeamPlayerIds, contractResult, scores, players, currentPlayerId, onRematch }) => {
+export const GameOver = ({ winner, winningTeamPlayerIds, contractResult, scores, matchScores, players, currentPlayerId, onRematch, isHost, dealNumber }) => {
   const winnerNames = winningTeamPlayerIds.map(playerId => players.find(player => player.id === playerId)?.name || 'Player');
-  const isWinner = winningTeamPlayerIds.includes(currentPlayerId);
 
   return (
     <motion.div
@@ -18,10 +17,10 @@ export const GameOver = ({ winner, winningTeamPlayerIds, contractResult, scores,
         className="my-auto w-full max-w-lg rounded-3xl border border-gold/40 bg-felt-dark p-5 shadow-2xl sm:p-8"
         aria-labelledby="game-over-title"
       >
-        <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-gold-light">Deal complete</p>
-        <h2 id="game-over-title" className="mt-2 text-center text-3xl font-bold text-white">{isWinner ? 'Your team wins!' : 'Contract settled'}</h2>
+        <p className="text-center text-xs font-semibold uppercase tracking-[0.2em] text-gold-light">Deal {dealNumber} complete</p>
+        <h2 id="game-over-title" className="mt-2 text-center text-3xl font-bold text-white">Contract settled</h2>
         <p className="mt-2 text-center text-sm text-white/65">
-          Winning team: {winnerNames.join(', ') || players.find(player => player.id === winner)?.name || 'Unknown'}
+          {contractResult?.successful ? 'Contract team' : 'Defending team'} won this deal: {winnerNames.join(', ') || players.find(player => player.id === winner)?.name || 'Unknown'}
         </p>
 
         {contractResult && (
@@ -37,7 +36,10 @@ export const GameOver = ({ winner, winningTeamPlayerIds, contractResult, scores,
         )}
 
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
-          <h3 className="mb-3 text-center text-sm font-semibold uppercase tracking-wider text-white/75">Card points</h3>
+          <div className="mb-3 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-white/55">
+            <h3>Player</h3>
+            <div className="flex gap-5"><span>Deal</span><span>Match</span></div>
+          </div>
           <ul className="space-y-2">
             {players.map(player => {
               const isOnWinningTeam = winningTeamPlayerIds.includes(player.id);
@@ -47,7 +49,10 @@ export const GameOver = ({ winner, winningTeamPlayerIds, contractResult, scores,
                     {player.name}{player.id === currentPlayerId ? ' (You)' : ''}
                     {isOnWinningTeam && <span className="ml-2 text-xs text-gold-light">Winner</span>}
                   </span>
-                  <span className="font-bold tabular-nums text-white">{scores[player.id] || 0}</span>
+                  <div className="flex min-w-24 justify-end gap-5 text-right font-bold tabular-nums text-white">
+                    <span className="w-8">{scores[player.id] || 0}</span>
+                    <span className="w-10 text-gold-light">{matchScores[player.id] || 0}</span>
+                  </div>
                 </li>
               );
             })}
@@ -55,14 +60,20 @@ export const GameOver = ({ winner, winningTeamPlayerIds, contractResult, scores,
         </div>
 
         <div className="mt-6 flex justify-center">
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={onRematch}
-            className="rounded-xl bg-gold px-6 py-3 font-bold text-felt-dark shadow-lg transition-colors hover:bg-gold-light"
-          >
-            Deal Again
-          </motion.button>
+          {isHost ? (
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              onClick={onRematch}
+              className="rounded-xl bg-gold px-6 py-3 font-bold text-felt-dark shadow-lg transition-colors hover:bg-gold-light"
+            >
+              Deal Again
+            </motion.button>
+          ) : (
+            <p className="rounded-xl border border-white/10 bg-white/5 px-5 py-3 text-sm text-white/65" role="status">
+              Waiting for the host to start the next deal
+            </p>
+          )}
         </div>
       </motion.section>
     </motion.div>
@@ -79,15 +90,21 @@ GameOver.propTypes = {
     signedPoints: PropTypes.number
   }),
   scores: PropTypes.object.isRequired,
+  matchScores: PropTypes.object,
   players: PropTypes.arrayOf(PropTypes.shape({
     id: PropTypes.string.isRequired,
     name: PropTypes.string.isRequired
   })).isRequired,
   currentPlayerId: PropTypes.string,
-  onRematch: PropTypes.func.isRequired
+  onRematch: PropTypes.func.isRequired,
+  isHost: PropTypes.bool,
+  dealNumber: PropTypes.number
 };
 
 GameOver.defaultProps = {
   winningTeamPlayerIds: [],
-  contractResult: null
+  contractResult: null,
+  matchScores: {},
+  isHost: false,
+  dealNumber: 1
 };

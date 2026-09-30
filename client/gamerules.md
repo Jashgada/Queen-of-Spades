@@ -32,5 +32,5 @@
 - Queen of Spades (Q♠): 30 points
 - All other cards: 0 points
 - The bidder's team meets its contract by collecting at least the bid amount.
-- A successful contract awards the bidder's team the bid amount. A failed contract subtracts the bid amount from that team, and the defending team wins the deal.
-- Scores do not carry over between deals yet.
+- A successful contract awards each member of the bidder's team the bid amount. A failed contract subtracts the bid amount from each member of that team, and the defending team wins the deal.
+- Match scores accumulate per player across deals. The host may start another deal; there is no automatic match-end condition yet.

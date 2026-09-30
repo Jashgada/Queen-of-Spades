@@ -384,6 +384,8 @@ export const setupSocketHandlers = (io: Server) => {
           winningTeamPlayerIds: gameState.winningTeamPlayerIds,
           contract: gameState.contract,
           contractResult: gameState.contractResult,
+          matchScores: gameState.matchScores,
+          dealNumber: gameState.dealNumber,
           roundNumber: gameState.roundNumber,
           message: 'Card played successfully'
         };
@@ -407,6 +409,8 @@ export const setupSocketHandlers = (io: Server) => {
             winner: playResult.roundWinner,
             points: playResult.roundPoints,
             scores: gameState.scores,
+            matchScores: gameState.matchScores,
+            dealNumber: gameState.dealNumber,
             lastRound: gameState.lastRound,
             roundNumber: gameState.roundNumber
           });
@@ -424,6 +428,8 @@ export const setupSocketHandlers = (io: Server) => {
             winningTeamPlayerIds: gameState.winningTeamPlayerIds,
             contractResult: gameState.contractResult,
             scores: gameState.scores,
+            matchScores: gameState.matchScores,
+            dealNumber: gameState.dealNumber,
             gameOver: true,
             gameStatus: 'finished'
           });
@@ -461,6 +467,16 @@ export const setupSocketHandlers = (io: Server) => {
         }
 
         const { gameCode } = playerInfo;
+        const game = gameManager.getGame(gameCode);
+        if (!game) {
+          callback?.({ success: false, message: 'Game not found' });
+          return;
+        }
+        if (game.getState().players[0]?.id !== playerInfo.playerId) {
+          callback?.({ success: false, message: 'Only the host can start the next deal' });
+          return;
+        }
+
         const result = gameManager.restartGame(gameCode);
 
         if (!result.success) {
@@ -473,8 +489,8 @@ export const setupSocketHandlers = (io: Server) => {
           return;
         }
 
-        const game = result.game!;
-        const gameState = game.getState();
+        const restartedGame = result.game!;
+        const gameState = restartedGame.getState();
 
         // Deliver each private hand before announcing that the new bidding phase is open.
         gameState.players.forEach(player => {
@@ -491,7 +507,7 @@ export const setupSocketHandlers = (io: Server) => {
 
         io.in(gameCode).emit('game:restarted', {
           success: true,
-          gameState: game.getPublicState(),
+          gameState: restartedGame.getPublicState(),
           message: 'Game restarted successfully'
         });
 

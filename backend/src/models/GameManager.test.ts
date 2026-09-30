@@ -94,6 +94,7 @@ describe('GameManager', () => {
     expect(gameState.status).toBe('bidding');
     expect(gameState.currentPlayer).toBeDefined();
     expect(gameState.roundNumber).toBe(0);
+    expect(gameState.dealNumber).toBe(1);
   });
 
   test('should not start a game with insufficient players', () => {
@@ -171,6 +172,9 @@ describe('GameManager', () => {
     state.gameOver = true;
     state.winner = state.players[0].id;
     state.status = 'finished';
+    state.matchScores[state.players[0].id] = 80;
+    state.matchScores[state.players[1].id] = -15;
+    const finishedDealNumber = state.dealNumber;
     
     // Restart the game
     const result = gameManager.restartGame(gameCode);
@@ -184,6 +188,10 @@ describe('GameManager', () => {
     expect(newState.gameOver).toBe(false);
     expect(newState.winner).toBeNull();
     expect(newState.roundNumber).toBe(0);
+    expect(newState.dealNumber).toBe(finishedDealNumber + 1);
+    expect(newState.matchScores[state.players[0].id]).toBe(80);
+    expect(newState.matchScores[state.players[1].id]).toBe(-15);
+    expect(Object.values(newState.scores).every(score => score === 0)).toBe(true);
     expect(newState.currentPlayer).toBeDefined();
   });
 
