@@ -1,9 +1,11 @@
 import PropTypes from 'prop-types';
-export const ScoreBoard = ({ players, scores, matchScores, currentPlayerId, activePlayerId, bid, dealNumber }) => {
+import { MatchScorecard } from './MatchScorecard';
+
+export const ScoreBoard = ({ players, scores, matchScoreHistory, currentPlayerId, activePlayerId, bid, dealNumber }) => {
   return (
     <section className="rounded-2xl border border-white/10 bg-green-900/70 p-4 shadow-lg sm:p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-bold text-white">Match scores</h2>
+        <h2 className="text-lg font-bold text-white">Deal points</h2>
         <span className="text-right text-xs text-white/60">Deal {dealNumber}<br />Bid {bid}</span>
       </div>
 
@@ -24,17 +26,15 @@ export const ScoreBoard = ({ players, scores, matchScores, currentPlayerId, acti
                     {player.name}{isYou ? ' (You)' : ''}
                   </p>
                   {isCurrentTurn && <p className="mt-0.5 text-xs text-yellow-200">Playing now</p>}
-                  <p className="mt-1 text-xs text-white/50">{score} card points this deal</p>
+                  <p className="mt-1 text-xs text-white/50">Card points this deal</p>
                 </div>
-                <div className="shrink-0 text-right">
-                  <span className="block text-xl font-bold tabular-nums text-yellow-300">{matchScores[player.id] || 0}</span>
-                  <span className="text-[10px] uppercase tracking-wider text-white/45">match</span>
-                </div>
+                <span className="shrink-0 text-xl font-bold tabular-nums text-yellow-300" aria-label={`${score} deal points`}>{score}</span>
               </div>
             </li>
           );
         })}
       </ol>
+      <div className="mt-4"><MatchScorecard players={players} matchScoreHistory={matchScoreHistory} /></div>
     </section>
   );
 };
@@ -47,7 +47,7 @@ ScoreBoard.propTypes = {
     })
   ).isRequired,
   scores: PropTypes.object.isRequired,
-  matchScores: PropTypes.object,
+  matchScoreHistory: PropTypes.array,
   currentPlayerId: PropTypes.string,
   activePlayerId: PropTypes.string,
   bid: PropTypes.number,
@@ -55,7 +55,7 @@ ScoreBoard.propTypes = {
 };
 
 ScoreBoard.defaultProps = {
-  matchScores: {},
+  matchScoreHistory: [],
   bid: 75,
   dealNumber: 1,
 };

@@ -85,9 +85,9 @@ Player identity for game actions is derived from the authenticated WebSocket con
 | `game.started` | `{ gameState }` | Room. |
 | `game.biddingUpdated` | `{ gameState }` | Room. |
 | `game.contractSet` | `{ gameState }` | Room. |
-| `game.cardPlayed` | `{ play, nextPlayer, scores, matchScores, dealNumber, ... }` | Room. |
-| `game.roundComplete` | `{ winner, points, scores, lastRound, roundNumber, ... }` | Room. |
-| `game.over` | `{ winner, winningTeamPlayerIds, contractResult, scores, matchScores, dealNumber }` | Room. |
+| `game.cardPlayed` | `{ play, nextPlayer, scores, matchScores, matchScoreHistory, dealNumber, ... }` | Room. |
+| `game.roundComplete` | `{ winner, points, scores, matchScores, matchScoreHistory, lastRound, roundNumber, ... }` | Room. |
+| `game.over` | `{ winner, winningTeamPlayerIds, contractResult, scores, matchScores, matchScoreHistory, dealNumber }` | Room. |
 | `game.restarted` | `{ gameState }` | Room; private `game.playerState` messages are sent to each player. |
 | `game.resumed` | `{ gameState }` | Resuming connection. |
 | `game.playerDisconnected` | `{ playerId, gracePeriodMs, gameState }` | Room. |
@@ -95,7 +95,7 @@ Player identity for game actions is derived from the authenticated WebSocket con
 | `game.playerLeft` | `{ playerId, gameState, players }` | Room. |
 | `protocol.error` | `{ code, message }` | Connection that sent an invalid or unsupported message. |
 
-Public game state excludes hands, socket/connection identifiers, and resume tokens. Each player receives only their own hand, including after a reconnect or when a new deal starts.
+Public game state excludes hands, socket/connection identifiers, and resume tokens. It includes `scores` for the current deal, cumulative `matchScores`, and `matchScoreHistory`, an ordered array of completed deals. Each history item has `{ "dealNumber": number, "changes": { "player-id": number } }`; each player is present with their signed bid award for the deal or `0` when defending. The sum of a player's changes across the current match equals their `matchScores` total. History is stored in the room's authoritative Durable Object snapshot, included in public state and reconnect responses, retained when the host starts the next deal, and initialized empty for a new match. Each player receives only their own hand, including after a reconnect or when a new deal starts.
 
 ## Error codes
 

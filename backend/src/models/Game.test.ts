@@ -146,11 +146,17 @@ describe('Game bidding and contract phases', () => {
     expect(successResult.contractResult).toMatchObject({ successful: true, signedPoints: 5 });
     expect(successState.winningTeamPlayerIds).toEqual([successful.players[0].id]);
     expect(successState.matchScores[successful.players[0].id]).toBe(5);
+    expect(successState.matchScoreHistory).toEqual([{
+      dealNumber: 1,
+      changes: { [successful.players[0].id]: 5, [successful.players[1].id]: 0 }
+    }]);
 
     successful.game.restart();
     expect(successful.game.getState().dealNumber).toBe(successState.dealNumber + 1);
     expect(successful.game.getState().scores[successful.players[0].id]).toBe(0);
     expect(successful.game.getState().matchScores[successful.players[0].id]).toBe(5);
+    expect(successful.game.getState().matchScoreHistory).toHaveLength(1);
+    expect(Game.fromSnapshot(successful.game.toSnapshot()).getPublicState().matchScoreHistory).toHaveLength(1);
 
     const failed = makeGame();
     failed.game.submitBid(failed.players[1].id, null);
@@ -165,6 +171,14 @@ describe('Game bidding and contract phases', () => {
     expect(failedResult.contractResult).toMatchObject({ successful: false, signedPoints: -75 });
     expect(failedState.winningTeamPlayerIds).toEqual([failed.players[1].id]);
     expect(failedState.matchScores[failed.players[0].id]).toBe(-75);
+    expect(failedState.matchScoreHistory).toEqual([{
+      dealNumber: 1,
+      changes: { [failed.players[0].id]: -75, [failed.players[1].id]: 0 }
+    }]);
+    for (const player of failed.players) {
+      expect(failedState.matchScoreHistory.reduce((total, deal) => total + deal.changes[player.id], 0))
+        .toBe(failedState.matchScores[player.id]);
+    }
   });
 
   test('counts called partners in the bidder team’s contract points', () => {
@@ -190,6 +204,43 @@ describe('Game bidding and contract phases', () => {
     expect(state.winningTeamPlayerIds).toEqual([players[0].id, players[1].id]);
     expect(state.matchScores[players[0].id]).toBe(20);
     expect(state.matchScores[players[1].id]).toBe(20);
+    expect(state.matchScoreHistory).toEqual([{
+      dealNumber: 1,
+      changes: { [players[0].id]: 20, [players[1].id]: 20, [players[2].id]: 0 }
+    }]);
+    for (const player of players) {
+      const historyTotal = state.matchScoreHistory.reduce((total, deal) => total + deal.changes[player.id], 0);
+      expect(historyTotal).toBe(state.matchScores[player.id]);
+    }
+  });
+
+  test('awards a failed contract penalty to every bidder-team member and zero to defenders', () => {
+    const { game, players } = makeGame(3);
+    game.submitBid(players[1].id, null);
+    game.submitBid(players[2].id, null);
+
+    const calledPartnerCard: Card = { suit: 'hearts', value: 'A' };
+    const state = game.getState();
+    state.hands[players[0].id] = [{ suit: 'hearts', value: '5' }];
+    state.hands[players[1].id] = [calledPartnerCard];
+    state.hands[players[2].id] = [{ suit: 'hearts', value: '2' }];
+    state.players.forEach(player => { player.handSize = 1; });
+
+    expect(game.submitContract(players[0].id, [calledPartnerCard], 'spades').success).toBe(true);
+    game.playCard(players[0].id, { suit: 'hearts', value: '5' });
+    game.playCard(players[1].id, calledPartnerCard);
+    const result = game.playCard(players[2].id, { suit: 'hearts', value: '2' });
+
+    expect(result.contractResult).toMatchObject({ successful: false, signedPoints: -75 });
+    expect(state.matchScoreHistory[0].changes).toEqual({
+      [players[0].id]: -75,
+      [players[1].id]: -75,
+      [players[2].id]: 0
+    });
+    for (const player of players) {
+      expect(state.matchScoreHistory.reduce((total, deal) => total + deal.changes[player.id], 0))
+        .toBe(state.matchScores[player.id]);
+    }
   });
 
   test.each([

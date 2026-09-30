@@ -6,6 +6,7 @@ import {
   Contract,
   ContractResult,
   GameState,
+  MatchScoreDeal,
   Player,
   Play,
   PublicGameState,
@@ -47,6 +48,7 @@ export class Game {
   static fromSnapshot(snapshot: GameSnapshot): Game {
     const game = new Game(snapshot.state.code);
     game.state = JSON.parse(JSON.stringify(snapshot.state)) as GameState;
+    game.state.matchScoreHistory ||= [];
     game.partnerPlayerIds = [...snapshot.partnerPlayerIds];
     return game;
   }
@@ -316,8 +318,9 @@ export class Game {
     const players = this.state.players;
     const code = this.state.code;
     const matchScores = this.state.matchScores;
+    const matchScoreHistory = this.state.matchScoreHistory;
     const dealNumber = this.state.dealNumber;
-    this.state = this.createInitialState(code, players, matchScores, dealNumber);
+    this.state = this.createInitialState(code, players, matchScores, dealNumber, matchScoreHistory);
     this.start();
   }
 
@@ -332,7 +335,8 @@ export class Game {
     code: string,
     players: Player[],
     existingMatchScores: Record<string, number> = {},
-    dealNumber = 0
+    dealNumber = 0,
+    matchScoreHistory: MatchScoreDeal[] = []
   ): GameState {
     const hands: Record<string, Card[]> = {};
     const scores: Record<string, number> = {};
@@ -355,6 +359,7 @@ export class Game {
       currentPlayer: null,
       scores,
       matchScores,
+      matchScoreHistory,
       gameOver: false,
       matchEnded: false,
       winner: null,
@@ -530,9 +535,13 @@ export class Game {
       winningTeamPlayerIds
     };
 
+    const changes: Record<string, number> = {};
+    this.state.players.forEach(player => { changes[player.id] = 0; });
     contractTeamIds.forEach(playerId => {
+      changes[playerId] = contractResult.signedPoints;
       this.state.matchScores[playerId] = (this.state.matchScores[playerId] || 0) + contractResult.signedPoints;
     });
+    this.state.matchScoreHistory.push({ dealNumber: this.state.dealNumber, changes });
 
     this.state.gameOver = true;
     this.state.status = 'finished';

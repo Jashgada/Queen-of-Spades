@@ -1,7 +1,8 @@
 import PropTypes from 'prop-types';
 import { motion } from 'framer-motion';
+import { MatchScorecard } from './MatchScorecard';
 
-export const GameOver = ({ winner, winningTeamPlayerIds, contractResult, scores, matchScores, players, currentPlayerId, onRematch, isHost, dealNumber }) => {
+export const GameOver = ({ winner, winningTeamPlayerIds, contractResult, scores, matchScoreHistory, players, currentPlayerId, onRematch, isHost, dealNumber }) => {
   const winnerNames = winningTeamPlayerIds.map(playerId => players.find(player => player.id === playerId)?.name || 'Player');
 
   return (
@@ -38,7 +39,7 @@ export const GameOver = ({ winner, winningTeamPlayerIds, contractResult, scores,
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
           <div className="mb-3 flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-white/55">
             <h3>Player</h3>
-            <div className="flex gap-5"><span>Deal</span><span>Match</span></div>
+            <span>Deal points</span>
           </div>
           <ul className="space-y-2">
             {players.map(player => {
@@ -49,15 +50,14 @@ export const GameOver = ({ winner, winningTeamPlayerIds, contractResult, scores,
                     {player.name}{player.id === currentPlayerId ? ' (You)' : ''}
                     {isOnWinningTeam && <span className="ml-2 text-xs text-gold-light">Winner</span>}
                   </span>
-                  <div className="flex min-w-24 justify-end gap-5 text-right font-bold tabular-nums text-white">
-                    <span className="w-8">{scores[player.id] || 0}</span>
-                    <span className="w-10 text-gold-light">{matchScores[player.id] || 0}</span>
-                  </div>
+                  <span className="min-w-8 text-right font-bold tabular-nums text-white">{scores[player.id] || 0}</span>
                 </li>
               );
             })}
           </ul>
         </div>
+
+        <div className="mt-4 flex justify-center"><MatchScorecard players={players} matchScoreHistory={matchScoreHistory} /></div>
 
         <div className="mt-6 flex justify-center">
           {isHost ? (
@@ -90,7 +90,7 @@ GameOver.propTypes = {
     signedPoints: PropTypes.number
   }),
   scores: PropTypes.object.isRequired,
-  matchScores: PropTypes.object,
+  matchScoreHistory: PropTypes.array,
   players: PropTypes.arrayOf(PropTypes.shape({
     id: PropTypes.string.isRequired,
     name: PropTypes.string.isRequired
@@ -104,7 +104,7 @@ GameOver.propTypes = {
 GameOver.defaultProps = {
   winningTeamPlayerIds: [],
   contractResult: null,
-  matchScores: {},
+  matchScoreHistory: [],
   isHost: false,
   dealNumber: 1
 };

@@ -138,7 +138,7 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
           <ScoreBoard
             players={players}
             scores={gameState.scores}
-            matchScores={gameState.matchScores}
+            matchScoreHistory={gameState.matchScoreHistory}
             currentPlayerId={gameState.currentPlayerId}
             activePlayerId={currentPlayer}
             bid={contract?.bid || gameState.currentBid || 75}
@@ -184,7 +184,7 @@ export const GameBoard = ({ gameState, onPlayCard, onRematch, errorMessage, isCo
             winningTeamPlayerIds={gameState.winningTeamPlayerIds}
             contractResult={gameState.contractResult}
             scores={gameState.scores}
-            matchScores={gameState.matchScores}
+            matchScoreHistory={gameState.matchScoreHistory}
             players={players}
             currentPlayerId={gameState.currentPlayerId}
             isHost={gameState.hostId === gameState.currentPlayerId}
@@ -226,6 +226,7 @@ GameBoard.propTypes = {
     ).isRequired,
     scores: PropTypes.object.isRequired,
     matchScores: PropTypes.object,
+    matchScoreHistory: PropTypes.array,
     rounds: PropTypes.array,
     roundNumber: PropTypes.number,
     dealNumber: PropTypes.number,

@@ -15,6 +15,7 @@ export const applyCardPlayedEvent = (previous, data) => {
     currentPlayer: data.nextPlayer,
     scores: data.scores || previous.scores,
     matchScores: data.matchScores || previous.matchScores,
+    matchScoreHistory: data.matchScoreHistory || previous.matchScoreHistory,
     dealNumber: data.dealNumber ?? previous.dealNumber,
     contract: data.contract || previous.contract,
     gameOver: data.gameOver ?? previous.gameOver,

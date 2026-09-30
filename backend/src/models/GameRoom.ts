@@ -411,6 +411,7 @@ export class GameRoom extends DurableObject<Env> {
       contract: state.contract,
       contractResult: state.contractResult,
       matchScores: state.matchScores,
+      matchScoreHistory: state.matchScoreHistory,
       dealNumber: state.dealNumber,
       roundNumber: state.roundNumber,
       message: 'Card played successfully'
@@ -424,6 +425,7 @@ export class GameRoom extends DurableObject<Env> {
         points: result.roundPoints,
         scores: state.scores,
         matchScores: state.matchScores,
+        matchScoreHistory: state.matchScoreHistory,
         dealNumber: state.dealNumber,
         lastRound: state.lastRound,
         roundNumber: state.roundNumber
@@ -436,6 +438,7 @@ export class GameRoom extends DurableObject<Env> {
         contractResult: state.contractResult,
         scores: state.scores,
         matchScores: state.matchScores,
+        matchScoreHistory: state.matchScoreHistory,
         dealNumber: state.dealNumber,
         gameOver: true,
         gameStatus: 'finished'

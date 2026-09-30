@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Hand } from './Hand';
 import { CopyRoomCodeButton } from './CopyRoomCodeButton';
+import { MatchScorecard } from './MatchScorecard';
 
 const SUITS = [
   { value: 'hearts', label: 'Hearts ♥' },
@@ -218,12 +219,13 @@ export const BiddingPhase = ({ gameState, currentPlayerId, isConnected, onBid, o
                       <span className="truncate font-medium">{player.name}{player.id === currentPlayerId ? ' (You)' : ''}</span>
                       <span className={`shrink-0 text-right text-xs ${passed ? 'text-white/40' : isActing ? 'text-gold-light' : 'text-white/55'}`}>
                         <span className="block">{player.connected === false ? 'Reconnecting' : passed ? 'Passed' : isHighBidder ? `High · ${gameState.currentBid}` : isActing ? 'Acting' : 'In'}</span>
-                        <span className="block text-[10px] text-gold-light">Match {gameState.matchScores?.[player.id] || 0}</span>
+                        <span className="block text-[10px] text-white/45">Deal points: {gameState.scores?.[player.id] || 0}</span>
                       </span>
                     </li>
                   );
                 })}
               </ul>
+              <div className="mt-3"><MatchScorecard players={players} matchScoreHistory={gameState.matchScoreHistory} /></div>
             </section>
 
             <section className="rounded-2xl border border-white/10 bg-felt-dark/70 p-4 sm:p-5">

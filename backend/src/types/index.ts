@@ -54,6 +54,11 @@ export interface ContractResult {
   winningTeamPlayerIds: string[];
 }
 
+export interface MatchScoreDeal {
+  dealNumber: number;
+  changes: Record<string, number>;
+}
+
 // Game state type
 export interface GameState {
   code: string;
@@ -73,6 +78,7 @@ export interface GameState {
   matchScores: {
     [playerId: string]: number;
   };
+  matchScoreHistory: MatchScoreDeal[];
   gameOver: boolean;
   matchEnded: boolean;
   winner: string | null;
