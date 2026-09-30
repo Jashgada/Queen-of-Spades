@@ -1,6 +1,8 @@
 # Backend Game Protocol
 
-The backend is authoritative for bidding, contracts, card legality, rounds, points, and deal results. Game state is held in memory and broadcast to players in the room. Each player receives only their own hand.
+The backend is authoritative for bidding, contracts, card legality, rounds, points, and deal results. Each room is owned by one SQLite-backed Cloudflare Durable Object. Each player receives only their own hand.
+
+The standard WebSocket JSON envelope, command names, request/response semantics, event catalog, and errors are defined in [websocket_protocol.md](./websocket_protocol.md).
 
 ## Game phases
 
@@ -14,31 +16,32 @@ The backend is authoritative for bidding, contracts, card legality, rounds, poin
 - The deal ends after all cards are played. If the bidder’s team captures at least the bid, each member earns the bid amount. Otherwise each loses that amount and the defending team wins.
 - Match scores accumulate per player across deals. Only the host may start another deal; there is no automatic match-end condition.
 
-## Client-to-server events
+## Client-to-server commands
 
-| Event | Payload | Purpose |
+| Type | Payload | Purpose |
 | --- | --- | --- |
-| `game:create` | `{ playerName }` | Create a room |
-| `game:join` | `{ gameCode, playerName }` | Join a waiting room |
-| `game:start` | none | Deal cards and begin bidding |
-| `game:bid` | `{ amount }` | Raise the current bid |
-| `game:pass` | none | Pass from the auction |
-| `game:setContract` | `{ partnerCalls, cutSuit }` | Set called cards and trump suit |
-| `game:playCard` | `{ card }` | Play the caller’s card; player identity comes from the socket |
-| `game:rematch` | none | Start another deal with the same room |
+| `game.create` | `{ playerName }` | Create a room after `POST /api/rooms` allocates its code |
+| `game.join` | `{ playerName }` | Join the addressed waiting room |
+| `game.resume` | `{ playerId, resumeToken }` | Restore the same player during the 60-second grace window |
+| `game.start` | `{}` | Deal cards and begin bidding; host only |
+| `game.bid` | `{ amount }` | Raise the current bid |
+| `game.pass` | `{}` | Pass from the auction |
+| `game.setContract` | `{ partnerCalls, cutSuit }` | Set called cards and trump suit |
+| `game.playCard` | `{ card }` | Play a card for the authenticated connection |
+| `game.nextDeal` | `{}` | Start another deal; host only |
+| `game.leave` | `{}` | Leave the room |
 
-All action events acknowledge with `{ success, message?, gameState? }`. Invalid or out-of-turn actions are rejected by the server.
+Each command includes a request ID and receives a correlated JSON response. Invalid or out-of-turn actions are rejected by the Durable Object.
 
 ## Server-to-client events
 
-- `game:started`, `game:biddingUpdated`, and `game:contractSet` send the public game state.
-- `game:playerState` sends a player their private hand and player ID.
-- `game:cardPlayed` broadcasts the played card, next player, current scores, and public contract state.
-- `game:roundComplete` broadcasts the round winner, points, and updated scores.
-- `game:over` broadcasts the signed contract result, winning team IDs, and final card-point totals.
-- `game:restarted` sends the new deal’s public state; private hands follow in `game:playerState`.
-- `game:playerJoined`, `game:playerLeft`, and `game:error` cover room updates and errors.
+- `game.started`, `game.biddingUpdated`, and `game.contractSet` send public game state.
+- `game.playerState` sends one player's private hand and player ID.
+- `game.cardPlayed`, `game.roundComplete`, and `game.over` broadcast play, scoring, and deal results.
+- `game.restarted` announces the next deal; private hands are sent separately to each player.
+- `game.playerJoined`, `game.playerDisconnected`, `game.playerReconnected`, and `game.playerLeft` cover room membership.
+- `protocol.error` reports malformed or unsupported messages.
 
 ## Public game state
 
-The public state includes the room code, players (without socket IDs or resume tokens), phase, current player, deal and round numbers, current round, completed rounds, per-deal card-point totals, cumulative per-player match scores, bid history, high bidder, passed players, partner card calls, cut suit, revealed partner IDs, and contract result when complete. It never includes other players’ hands or unrevealed partner identities.
+The public state includes the room code, players (without connection IDs or resume tokens), phase, current player, deal and round numbers, current round, completed rounds, per-deal card-point totals, cumulative per-player match scores, bid history, high bidder, passed players, partner card calls, cut suit, revealed partner IDs, and contract result when complete. It never includes other players’ hands or unrevealed partner identities.

@@ -68,7 +68,7 @@ export const useGame = () => {
     if (!connected) return undefined;
 
     const applyState = (data) => {
-      if (data?.success && data.gameState) {
+      if (data?.gameState) {
         setGameState(previous => mergePublicGameState(previous, data.gameState));
       }
     };
@@ -163,36 +163,36 @@ export const useGame = () => {
       }
     };
 
-    socket.on('game:playerJoined', handlePlayerJoined);
-    socket.on('game:started', applyState);
-    socket.on('game:biddingUpdated', applyState);
-    socket.on('game:contractSet', applyState);
-    socket.on('game:restarted', applyState);
-    socket.on('game:resumed', applyState);
-    socket.on('game:playerDisconnected', applyState);
-    socket.on('game:playerReconnected', applyState);
-    socket.on('game:playerLeft', handlePlayerLeft);
-    socket.on('game:cardPlayed', handleCardPlayed);
-    socket.on('game:roundComplete', handleRoundComplete);
-    socket.on('game:over', handleGameOver);
-    socket.on('game:error', handleError);
-    socket.on('game:playerState', handlePlayerState);
+    socket.on('game.playerJoined', handlePlayerJoined);
+    socket.on('game.started', applyState);
+    socket.on('game.biddingUpdated', applyState);
+    socket.on('game.contractSet', applyState);
+    socket.on('game.restarted', applyState);
+    socket.on('game.resumed', applyState);
+    socket.on('game.playerDisconnected', applyState);
+    socket.on('game.playerReconnected', applyState);
+    socket.on('game.playerLeft', handlePlayerLeft);
+    socket.on('game.cardPlayed', handleCardPlayed);
+    socket.on('game.roundComplete', handleRoundComplete);
+    socket.on('game.over', handleGameOver);
+    socket.on('protocol.error', handleError);
+    socket.on('game.playerState', handlePlayerState);
 
     return () => {
-      socket.off('game:playerJoined', handlePlayerJoined);
-      socket.off('game:started', applyState);
-      socket.off('game:biddingUpdated', applyState);
-      socket.off('game:contractSet', applyState);
-      socket.off('game:restarted', applyState);
-      socket.off('game:resumed', applyState);
-      socket.off('game:playerDisconnected', applyState);
-      socket.off('game:playerReconnected', applyState);
-      socket.off('game:playerLeft', handlePlayerLeft);
-      socket.off('game:cardPlayed', handleCardPlayed);
-      socket.off('game:roundComplete', handleRoundComplete);
-      socket.off('game:over', handleGameOver);
-      socket.off('game:error', handleError);
-      socket.off('game:playerState', handlePlayerState);
+      socket.off('game.playerJoined', handlePlayerJoined);
+      socket.off('game.started', applyState);
+      socket.off('game.biddingUpdated', applyState);
+      socket.off('game.contractSet', applyState);
+      socket.off('game.restarted', applyState);
+      socket.off('game.resumed', applyState);
+      socket.off('game.playerDisconnected', applyState);
+      socket.off('game.playerReconnected', applyState);
+      socket.off('game.playerLeft', handlePlayerLeft);
+      socket.off('game.cardPlayed', handleCardPlayed);
+      socket.off('game.roundComplete', handleRoundComplete);
+      socket.off('game.over', handleGameOver);
+      socket.off('protocol.error', handleError);
+      socket.off('game.playerState', handlePlayerState);
     };
   }, [connected, socket]);
 
@@ -207,12 +207,14 @@ export const useGame = () => {
       clearResumeSession();
       return;
     }
-    if (!session?.gameCode || !session?.playerId || !session?.resumeToken) return;
+    if (!session?.gameCode || !session?.playerId || !session?.resumeToken || socket.roomCode !== session.gameCode) return;
 
     gameService.resumeGame(session, response => {
       if (!response?.success) {
-        clearResumeSession();
-        setGameState(INITIAL_STATE);
+        if (['INVALID_RESUME_CREDENTIALS', 'ROOM_NOT_FOUND'].includes(response?.code)) {
+          clearResumeSession();
+          setGameState(INITIAL_STATE);
+        }
         setErrorMessage(response?.message || 'Could not restore the saved game');
         return;
       }

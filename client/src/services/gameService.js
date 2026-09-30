@@ -1,96 +1,61 @@
+import config from '../config';
 import socket from './socketService';
 
-// Game service functions - using the exact same format as test.html
+const reportFailure = (callback, error) => {
+  callback?.({
+    success: false,
+    code: 'CONNECTION_FAILED',
+    message: error?.message || 'Could not reach the game server'
+  });
+};
+
+const connectAndSend = (gameCode, type, payload, callback) => {
+  socket.connect(gameCode)
+    .then(() => socket.emit(type, payload, callback))
+    .catch(error => reportFailure(callback, error));
+};
+
 export const gameService = {
-  // Create a new game
-  createGame: (playerName, callback) => {
-    console.log('[gameService] Creating game with player name:', playerName);
-    
-    if (!socket.connected) {
-      console.log('[gameService] Socket not connected, connecting...');
-      socket.connect();
+  createGame: async (playerName, callback) => {
+    try {
+      const allocation = await fetch(`${config.apiUrl}/api/rooms`, { method: 'POST' });
+      const result = await allocation.json();
+      if (!allocation.ok || !result.success) throw new Error(result.message || 'Could not allocate a room');
+      connectAndSend(result.gameCode, 'game.create', { playerName }, callback);
+    } catch (error) {
+      reportFailure(callback, error);
     }
-    
-    // Use the exact format from test.html
-    socket.emit('game:create', { playerName }, callback);
   },
-  
-  // Join an existing game
+
   joinGame: (gameCode, playerName, callback) => {
-    console.log('[gameService] Joining game with code:', gameCode, 'and name:', playerName);
-    
-    if (!socket.connected) {
-      console.log('[gameService] Socket not connected, connecting...');
-      socket.connect();
-    }
-    
-    // Use the exact format from test.html
-    socket.emit('game:join', { gameCode, playerName }, callback);
+    connectAndSend(gameCode, 'game.join', { playerName }, callback);
   },
 
   resumeGame: (session, callback) => {
-    if (!socket.connected) socket.connect();
-    socket.emit('game:resume', session, callback);
+    connectAndSend(session.gameCode, 'game.resume', {
+      playerId: session.playerId,
+      resumeToken: session.resumeToken
+    }, callback);
   },
 
-  leaveGame: (callback) => {
-    if (!socket.connected) socket.connect();
-    socket.emit('game:leave', callback);
-  },
-  
-  // Start a game
-  startGame: (callback) => {
-    console.log('[gameService] Starting game');
-    
+  leaveGame: callback => {
     if (!socket.connected) {
-      console.log('[gameService] Socket not connected, connecting...');
-      socket.connect();
+      socket.disconnect();
+      callback?.({ success: true });
+      return;
     }
-    
-    // Use the exact format from test.html
-    socket.emit('game:start', callback);
+    socket.emit('game.leave', {}, response => {
+      socket.disconnect();
+      callback?.(response);
+    });
   },
 
-  placeBid: (amount, callback) => {
-    if (!socket.connected) socket.connect();
-    socket.emit('game:bid', { amount }, callback);
-  },
-
-  passBid: (callback) => {
-    if (!socket.connected) socket.connect();
-    socket.emit('game:pass', callback);
-  },
-
-  setContract: (partnerCalls, cutSuit, callback) => {
-    if (!socket.connected) socket.connect();
-    socket.emit('game:setContract', { partnerCalls, cutSuit }, callback);
-  },
-  
-  // Play a card
-  playCard: (playerId, card, callback) => {
-    console.log('[gameService] Playing card:', playerId, card);
-    
-    if (!socket.connected) {
-      console.log('[gameService] Socket not connected, connecting...');
-      socket.connect();
-    }
-    
-    // Use the exact format from test.html
-    socket.emit('game:playCard', { playerId, card }, callback);
-  },
-  
-  // Request a rematch
-  rematch: (callback) => {
-    console.log('[gameService] Requesting rematch');
-    
-    if (!socket.connected) {
-      console.log('[gameService] Socket not connected, connecting...');
-      socket.connect();
-    }
-    
-    // Use the exact format from test.html
-    socket.emit('game:rematch', callback);
-  }
+  startGame: callback => socket.emit('game.start', {}, callback),
+  placeBid: (amount, callback) => socket.emit('game.bid', { amount }, callback),
+  passBid: callback => socket.emit('game.pass', {}, callback),
+  setContract: (partnerCalls, cutSuit, callback) => socket.emit('game.setContract', { partnerCalls, cutSuit }, callback),
+  playCard: (_playerId, card, callback) => socket.emit('game.playCard', { card }, callback),
+  rematch: callback => socket.emit('game.nextDeal', {}, callback)
 };
 
 export default gameService;

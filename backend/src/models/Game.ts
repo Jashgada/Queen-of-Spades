@@ -24,6 +24,11 @@ interface PlayCardResult {
   contractResult?: ContractResult | null;
 }
 
+export interface GameSnapshot {
+  state: GameState;
+  partnerPlayerIds: string[];
+}
+
 const SUITS: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
 const VALUES: CardValue[] = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 const CARD_RANK: Record<CardValue, number> = {
@@ -39,6 +44,20 @@ export class Game {
     this.state = this.createInitialState(code, []);
   }
 
+  static fromSnapshot(snapshot: GameSnapshot): Game {
+    const game = new Game(snapshot.state.code);
+    game.state = JSON.parse(JSON.stringify(snapshot.state)) as GameState;
+    game.partnerPlayerIds = [...snapshot.partnerPlayerIds];
+    return game;
+  }
+
+  toSnapshot(): GameSnapshot {
+    return {
+      state: JSON.parse(JSON.stringify(this.state)) as GameState,
+      partnerPlayerIds: [...this.partnerPlayerIds]
+    };
+  }
+
   getState(): GameState {
     return this.state;
   }
@@ -47,7 +66,7 @@ export class Game {
     const { hands: _hands, players, ...publicState } = this.state;
     return {
       ...publicState,
-      players: players.map(({ socketId: _socketId, resumeToken: _resumeToken, ...player }) => player)
+      players: players.map(({ connectionId: _connectionId, resumeToken: _resumeToken, ...player }) => player)
     };
   }
 
@@ -59,11 +78,11 @@ export class Game {
     };
   }
 
-  addPlayer(name: string, socketId: string): Player {
+  addPlayer(name: string, connectionId: string): Player {
     const player: Player = {
       id: nanoid(8),
       name,
-      socketId,
+      connectionId,
       resumeToken: nanoid(32),
       connected: true,
       handSize: 0
@@ -76,10 +95,10 @@ export class Game {
     return player;
   }
 
-  updatePlayerConnection(playerId: string, socketId: string, connected: boolean): Player | undefined {
+  updatePlayerConnection(playerId: string, connectionId: string, connected: boolean): Player | undefined {
     const player = this.state.players.find(candidate => candidate.id === playerId);
     if (!player) return undefined;
-    player.socketId = socketId;
+    player.connectionId = connectionId;
     player.connected = connected;
     return player;
   }

@@ -64,7 +64,7 @@ export const Game = () => {
   // Create a new game
   const handleCreateGame = async (e) => {
     e.preventDefault();
-    if (playerName.trim() && connected) {
+    if (playerName.trim()) {
       setIsLoading(true);
       console.log('[Game] Creating game with player name:', playerName.trim());
       
@@ -93,15 +93,13 @@ export const Game = () => {
         setIsLoading(false);
         alert(error.message || 'Failed to create game');
       }
-    } else if (!connected) {
-      alert('Not connected to server. Please try again.');
     }
   };
 
   // Join an existing game
   const handleJoinGame = async (e) => {
     e.preventDefault();
-    if (playerName.trim() && gameCode.trim() && connected) {
+    if (playerName.trim() && gameCode.trim()) {
       setIsLoading(true);
       console.log('[Game] Joining game with code:', gameCode.trim(), 'and name:', playerName.trim());
       
@@ -130,8 +128,6 @@ export const Game = () => {
         setIsLoading(false);
         alert(error.message || 'Failed to join game');
       }
-    } else if (!connected) {
-      alert('Not connected to server. Please try again.');
     }
   };
 
@@ -166,7 +162,7 @@ export const Game = () => {
     console.log('[Game] Requesting rematch');
     try {
       await rematch();
-      // The view will be updated by state changes from the game:restarted event
+      // The view will be updated by the game.restarted WebSocket event
     } catch (error) {
       console.error('[Game] Error requesting rematch:', error);
       alert(error.message || 'Failed to request rematch');
@@ -290,19 +286,13 @@ export const Game = () => {
               </button>
               <button
                 type="submit"
-                disabled={isLoading || !connected}
+                disabled={isLoading}
                 className="flex-1 rounded-lg bg-gold px-3 py-2.5 font-bold text-felt-dark transition-colors hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isLoading ? 'Creating...' : 'Create Room'}
               </button>
             </div>
           </form>
-          
-          {!connected && (
-            <div className="mt-4 text-center text-sm text-gold-light" role="status">
-              Connecting to server...
-            </div>
-          )}
           
           {errorMessage && (
             <div className="mt-4 rounded-lg border border-red-300/30 bg-red-900/40 p-3 text-center text-sm text-red-100" role="alert">
@@ -374,19 +364,13 @@ export const Game = () => {
               </button>
               <button
                 type="submit"
-                disabled={isLoading || !connected}
+                disabled={isLoading}
                 className="flex-1 rounded-lg bg-gold px-3 py-2.5 font-bold text-felt-dark transition-colors hover:bg-gold-light disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isLoading ? 'Joining...' : 'Join Room'}
               </button>
             </div>
           </form>
-          
-          {!connected && (
-            <div className="mt-4 text-center text-sm text-gold-light" role="status">
-              Connecting to server...
-            </div>
-          )}
           
           {errorMessage && (
             <div className="mt-4 rounded-lg border border-red-300/30 bg-red-900/40 p-3 text-center text-sm text-red-100" role="alert">

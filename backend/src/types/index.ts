@@ -12,7 +12,7 @@ export interface Card {
 export interface Player {
   id: string;
   name: string;
-  socketId: string;
+  connectionId: string;
   resumeToken: string;
   connected: boolean;
   handSize: number;
@@ -90,14 +90,8 @@ export interface GameState {
 }
 
 export type PublicGameState = Omit<GameState, 'hands' | 'players'> & {
-  players: Omit<Player, 'socketId' | 'resumeToken'>[];
+  players: Omit<Player, 'connectionId' | 'resumeToken'>[];
 };
-
-export interface ResumeGameParams {
-  gameCode: string;
-  playerId: string;
-  resumeToken: string;
-}
 
 export interface BidParams {
   amount: number;
@@ -106,52 +100,4 @@ export interface BidParams {
 export interface ContractParams {
   partnerCalls: Card[];
   cutSuit: Suit;
-}
-
-// Socket event types
-export interface CreateGameParams {
-  playerName: string;
-}
-
-export interface JoinGameParams {
-  gameCode: string;
-  playerName: string;
-}
-
-export interface PlayCardParams {
-  playerId: string;
-  card: Card;
-}
-
-// Socket response types
-export interface GameResponse {
-  success: boolean;
-  message: string;
-  gameCode?: string;
-  player?: {
-    id: string;
-    name: string;
-    handSize: number;
-    resumeToken?: string;
-  };
-  players?: Player[];
-  gameState?: GameState;
-}
-
-export interface PlayResponse {
-  success: boolean;
-  play?: {
-    playerId: string;
-    card: Card;
-  };
-  nextPlayer?: string;
-  roundComplete?: boolean;
-  roundWinner?: string;
-  roundPoints?: number;
-  scores?: {
-    [playerId: string]: number;
-  };
-  gameOver?: boolean;
-  winner?: string;
-  message: string;
 }

@@ -1,13 +1,12 @@
 {
-    "compilerOptions": {
-      "target": "ES6",
-      "module": "commonjs",
-      "outDir": "./dist",
-        "rootDir": "./src",
-      "strict": true,
-      "esModuleInterop": true
-    },
-    "watch": ["src"],
-    "ext": "ts",
-    "exec": "ts-node ./src/app.ts"
-  }
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "types": ["@cloudflare/workers-types", "jest", "node"]
+  },
+  "include": ["src/**/*.ts"]
+}

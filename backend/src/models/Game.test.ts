@@ -24,6 +24,25 @@ describe('Game bidding and contract phases', () => {
     expect(Object.values(state.hands).flat()).toHaveLength(52);
   });
 
+  test('round-trips a private game snapshot for durable room recovery', () => {
+    const { game, players } = makeGame(3);
+    const calledCard: Card = { suit: 'hearts', value: 'A' };
+    game.getState().hands[players[1].id] = [calledCard];
+    game.getState().hands[players[0].id] = [{ suit: 'clubs', value: '2' }];
+    game.getState().hands[players[2].id] = [{ suit: 'diamonds', value: '2' }];
+    for (const player of players) game.getState().players.find(candidate => candidate.id === player.id)!.handSize = game.getState().hands[player.id].length;
+    game.submitBid(players[1].id, null);
+    game.submitBid(players[2].id, null);
+    game.submitContract(players[0].id, [calledCard], 'spades');
+
+    const restored = Game.fromSnapshot(game.toSnapshot());
+    expect(restored.getState()).toEqual(game.getState());
+    expect(restored.getPublicState()).not.toHaveProperty('hands');
+    restored.getState().currentPlayer = players[1].id;
+    expect(restored.playCard(players[1].id, calledCard).valid).toBe(true);
+    expect(restored.getState().contract?.revealedPartnerIds).toContain(players[1].id);
+  });
+
   test.each([3, 5, 6])('deals %i-player hands evenly without removing spades or scoring cards', playerCount => {
     const { game } = makeGame(playerCount);
     const dealtCards = Object.values(game.getState().hands).flat();
@@ -82,7 +101,7 @@ describe('Game bidding and contract phases', () => {
     expect(game.submitContract(bidder.id, [], 'spades').success).toBe(false);
     expect(game.submitContract(bidder.id, [calledCard], 'spades').success).toBe(true);
     expect(game.getPublicState().contract?.revealedPartnerIds).toEqual([]);
-    expect(game.getPublicState().players[0]).not.toHaveProperty('socketId');
+    expect(game.getPublicState().players[0]).not.toHaveProperty('connectionId');
 
     game.getState().currentPlayer = players[1].id;
     const result = game.playCard(players[1].id, calledCard);
