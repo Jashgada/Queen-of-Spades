@@ -3,6 +3,7 @@ import { GameRoom } from './models/GameRoom';
 interface Env {
   GAME_ROOMS: DurableObjectNamespace<GameRoom>;
   ALLOWED_ORIGIN?: string;
+  ALLOWED_ORIGIN_SUFFIX?: string;
 }
 
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -14,25 +15,23 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin');
-    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
-    const allowedOrigin = env.ALLOWED_ORIGIN || (isLocal ? 'http://localhost:5173' : undefined);
+    const originAllowed = isAllowedOrigin(origin, url, env);
+    if (origin && !originAllowed) {
+      return Response.json({ success: false, message: 'Origin is not allowed' }, { status: 403 });
+    }
+
     const corsHeaders: Record<string, string> = {};
-    if (origin && origin === allowedOrigin) {
+    if (origin && originAllowed) {
       Object.assign(corsHeaders, {
         'Access-Control-Allow-Origin': origin,
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Credentials': 'true',
         'Vary': 'Origin'
       });
     }
 
     if (request.method === 'OPTIONS' && url.pathname === '/api/rooms') {
       return new Response(null, { status: 204, headers: corsHeaders });
-    }
-
-    if (origin && (!allowedOrigin || origin !== allowedOrigin)) {
-      return Response.json({ success: false, message: 'Origin is not allowed' }, { status: 403 });
     }
 
     if (url.pathname === '/health') {
@@ -84,4 +83,26 @@ export default {
 function generateRoomCode(): string {
   const values = crypto.getRandomValues(new Uint8Array(ROOM_CODE_LENGTH));
   return Array.from(values, value => ROOM_CODE_ALPHABET[value % ROOM_CODE_ALPHABET.length]).join('');
+}
+
+function isAllowedOrigin(origin: string | null, requestUrl: URL, env: Env): boolean {
+  if (!origin) return true;
+  if (origin === env.ALLOWED_ORIGIN) return true;
+
+  const isLocalWorker = requestUrl.hostname === 'localhost' || requestUrl.hostname === '127.0.0.1';
+  const localOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+  if (isLocalWorker && localOrigins.includes(origin)) return true;
+
+  if (!env.ALLOWED_ORIGIN_SUFFIX) return false;
+  let parsedOrigin: URL;
+  try {
+    parsedOrigin = new URL(origin);
+  } catch {
+    return false;
+  }
+
+  const allowedSuffix = env.ALLOWED_ORIGIN_SUFFIX.toLowerCase().replace(/^\.+/, '');
+  const hostname = parsedOrigin.hostname.toLowerCase();
+  return parsedOrigin.protocol === 'https:' &&
+    (hostname === allowedSuffix || hostname.endsWith(`.${allowedSuffix}`));
 }

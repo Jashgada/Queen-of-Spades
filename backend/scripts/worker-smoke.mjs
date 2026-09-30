@@ -88,11 +88,40 @@ let resumedSocket;
 
 try {
   await startWorker();
-  const allocationResponse = await fetch(`${baseUrl}/api/rooms`, {
-    method: 'POST',
+  const productionOrigin = 'https://4c4ab488.queen-of-spades.pages.dev';
+  const productionOriginPreflight = await fetch(`${baseUrl}/api/rooms`, {
+    method: 'OPTIONS',
+    headers: { Origin: productionOrigin }
+  });
+  assert.equal(productionOriginPreflight.status, 204);
+  assert.equal(productionOriginPreflight.headers.get('Access-Control-Allow-Origin'), productionOrigin);
+
+  const localOriginPreflight = await fetch(`${baseUrl}/api/rooms`, {
+    method: 'OPTIONS',
     headers: { Origin: origin }
   });
-  assert.equal(allocationResponse.headers.get('Access-Control-Allow-Origin'), origin);
+  assert.equal(localOriginPreflight.status, 204);
+  assert.equal(localOriginPreflight.headers.get('Access-Control-Allow-Origin'), origin);
+
+  const previewOrigin = 'https://test-preview.queen-of-spades.pages.dev';
+  const previewPreflight = await fetch(`${baseUrl}/api/rooms`, {
+    method: 'OPTIONS',
+    headers: { Origin: previewOrigin }
+  });
+  assert.equal(previewPreflight.status, 204);
+  assert.equal(previewPreflight.headers.get('Access-Control-Allow-Origin'), previewOrigin);
+
+  const untrustedOriginPreflight = await fetch(`${baseUrl}/api/rooms`, {
+    method: 'OPTIONS',
+    headers: { Origin: 'https://queen-of-spades.pages.dev.attacker.invalid' }
+  });
+  assert.equal(untrustedOriginPreflight.status, 403);
+
+  const allocationResponse = await fetch(`${baseUrl}/api/rooms`, {
+    method: 'POST',
+    headers: { Origin: productionOrigin }
+  });
+  assert.equal(allocationResponse.headers.get('Access-Control-Allow-Origin'), productionOrigin);
   const allocation = await allocationResponse.json();
   assert.equal(allocation.success, true);
 

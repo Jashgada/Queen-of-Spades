@@ -32,7 +32,7 @@ npx wrangler login
 npm run deploy
 ```
 
-Set `ALLOWED_ORIGIN` in the Worker environment to the deployed frontend origin. Deploy the `client` directory as a Cloudflare Pages project with build command `npm run build`, output directory `dist`, and `VITE_API_URL` set to the Worker URL. The Durable Object's storage persists room state through hibernation and Worker restarts. Room-data expiry after all players leave has not been selected yet.
+Deploy the `client` directory as a Cloudflare Pages project with build command `npm run build`, output directory `dist`, and `VITE_API_URL` set to the Worker URL. The Worker configuration allowlists the production Pages origin and HTTPS preview subdomains under `queen-of-spades.pages.dev`; update `ALLOWED_ORIGIN` and `ALLOWED_ORIGIN_SUFFIX` in `backend/wrangler.jsonc` if the Pages hostname changes. Local Vite development origins remain allowed for the local Worker. The Durable Object's storage persists room state through hibernation and Worker restarts. Room-data expiry after all players leave has not been selected yet.
 
 ### How the game works
 Tables support 2–6 players, with 4–6 recommended. A deal begins with a Bidding Phase: the first player opens at 75, players bid clockwise in increments of 5 up to 150, or pass. The last player still bidding wins the contract.
